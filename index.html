@@ -1,7 +1,158 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Smaran — Diabetes follow-up cockpit</title><link rel="stylesheet" href="styles.css"></head><body>
-<header class="topbar"><div class="brand"><div class="mark">S</div><div><strong>Smaran</strong><span>Diabetes follow-up cockpit</span></div></div><div class="clinic"><span class="live"></span><span>Barasat Diabetes &amp; Diagnostics</span><b>03 Oct 2026</b></div><button class="icon-btn" aria-label="Settings">⚙</button></header>
-<main><div class="demo-note">DEMO MODE · All names, record IDs, dates, phone fragments and clinical values shown here are fictional and made up for demonstration.</div><section class="hero"><div><p class="overline">FOLLOW-UP OPERATIONS</p><h1>Know who needs a call today.</h1><p class="sub">A clear, shared queue built from the records your clinic already keeps.</p></div><button class="primary" id="runSync">↻ Run nightly sync <span>Last run 06:10</span></button></section>
-<section class="metrics"><article><span>Needs attention</span><strong id="attention">—</strong><small>due or overdue</small></article><article><span>Overdue &gt; 90 days</span><strong id="overdue">—</strong><small>priority queue</small></article><article><span>Returned this month</span><strong>24</strong><small>follow-up completed</small></article><article><span>Records linked</span><strong>92%</strong><small>of active patients</small></article></section>
-<section class="workspace"><aside class="queue"><div class="queue-head"><div><p class="overline">CALL QUEUE</p><h2>Today’s follow-up list</h2></div><button class="filter-btn" id="filterBtn">Filter <span>☷</span></button></div><div class="search"><span>⌕</span><input id="search" placeholder="Search name, phone or record ID"></div><div class="chips"><button class="chip active" data-filter="all">All <b id="allCount"></b></button><button class="chip" data-filter="overdue">Overdue <b id="overdueCount"></b></button><button class="chip" data-filter="slipping">Slipping <b id="slippingCount"></b></button><button class="chip" data-filter="due">Due soon <b id="dueCount"></b></button></div><div id="patientList" class="patient-list"></div></aside>
-<section class="detail" id="detail"><div class="empty"><span class="empty-mark">→</span><h2>Select a person</h2><p>Choose a patient from the queue to review their timeline and next action.</p></div></section></section></main>
-<div class="toast" id="toast"></div><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Smaran — Diabetes follow-up cockpit</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">S</div>
+      <div class="brand-text">
+        <strong>Smaran</strong>
+        <span>Diabetes follow-up cockpit</span>
+      </div>
+    </div>
+    <div class="clinic">
+      <span class="live" aria-hidden="true"></span>
+      <span>Barasat Diabetes &amp; Diagnostics</span>
+      <b>03 Oct 2026</b>
+    </div>
+    <button class="icon-btn" id="settingsBtn" aria-label="Open settings" title="Settings">
+      <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94a7.49 7.49 0 0 0 .05-.94 7.49 7.49 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.03 7.03 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.25 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.03.31-.05.62-.05.94 0 .32.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.42.33.67.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.25.11.53.02.67-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <div class="demo-note">Demo mode — all names, record IDs, dates, phone fragments and values shown here are fictional, for demonstration only.</div>
+
+    <section class="hero">
+      <div class="hero-text">
+        <h1>Know who needs a call today.</h1>
+        <p class="sub">A clear, shared queue built from the records your clinic already keeps.</p>
+      </div>
+      <button class="primary" id="runSync">
+        <span class="ic" aria-hidden="true">↻</span>
+        <span>Run nightly sync</span>
+        <em id="syncTime">Last run 06:10</em>
+      </button>
+    </section>
+
+    <section class="ai-strip" id="aiStrip">
+      <span class="ai-badge"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12 2l1.9 6.3L20 10l-6.1 1.7L12 18l-1.9-6.3L4 10l6.1-1.7L12 2Z"/></svg> AI</span>
+      <p class="ai-text" id="aiSummary">Smaran reviewed <b>318</b> active records overnight — linked <b>18</b> new lab results and surfaced <b>2</b> slipping follow-up patterns.</p>
+      <span class="ai-ts">Analysis 06:10 · automatic</span>
+    </section>
+
+    <section class="metrics">
+      <article>
+        <span>Needs attention</span>
+        <strong id="attention">—</strong>
+        <small>due or overdue</small>
+      </article>
+      <article>
+        <span>Overdue &gt; 90 days</span>
+        <strong id="overdue">—</strong>
+        <small>priority queue</small>
+      </article>
+      <article>
+        <span>Returned this month</span>
+        <strong>24</strong>
+        <small>follow-up completed</small>
+      </article>
+      <article>
+        <span>Auto-linked records</span>
+        <strong>92%</strong>
+        <small>of active patients</small>
+      </article>
+    </section>
+
+    <section class="workspace">
+      <aside class="queue">
+        <div class="queue-head">
+          <h2>Today's follow-up list</h2>
+          <button class="filter-btn" id="filterBtn">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4-2v-4L3 5Z"/></svg>
+            Filter
+          </button>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M10 4a6 6 0 1 1-4.24 10.24l-3 3-1.42-1.42 3-3A6 6 0 0 1 10 4Zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg>
+          <input id="search" placeholder="Search name, phone or record ID">
+        </div>
+        <div class="chips">
+          <button class="chip active" data-filter="all">All <b id="allCount"></b></button>
+          <button class="chip" data-filter="overdue">Overdue <b id="overdueCount"></b></button>
+          <button class="chip" data-filter="slipping">Slipping <b id="slippingCount"></b></button>
+          <button class="chip" data-filter="due">Due soon <b id="dueCount"></b></button>
+        </div>
+        <div id="patientList" class="patient-list"></div>
+      </aside>
+
+      <section class="detail" id="detail">
+        <div class="empty">
+          <span class="empty-mark" aria-hidden="true">→</span>
+          <h2>Select a person</h2>
+          <p>Choose a patient from the queue to review their timeline and next action.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Settings">
+    <div class="drawer-head">
+      <h2>Settings</h2>
+      <button class="icon-btn" id="drawerClose" aria-label="Close settings">✕</button>
+    </div>
+    <div class="drawer-body">
+      <label class="field">
+        <span>Nightly sync time</span>
+        <select id="setSync">
+          <option>06:10</option>
+          <option>05:00</option>
+          <option>22:00</option>
+          <option>Hourly</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Default outreach language</span>
+        <select id="setLang">
+          <option value="auto">Match patient record</option>
+          <option value="bn">Bengali</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Overdue threshold</span>
+        <select id="setThreshold">
+          <option>90 days</option>
+          <option>60 days</option>
+          <option>120 days</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Outreach channel</span>
+        <select id="setChannel">
+          <option>WhatsApp</option>
+          <option>SMS</option>
+        </select>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="setApproval" checked disabled>
+        <span>Require human approval before any message is sent</span>
+      </label>
+      <p class="drawer-note">Demo settings — changes are not saved between sessions.</p>
+    </div>
+    <div class="drawer-foot">
+      <button class="secondary" id="drawerCancel">Cancel</button>
+      <button class="send" id="drawerSave">Save settings</button>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
