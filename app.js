@@ -1,169 +1,215 @@
-/* Smaran — diabetes follow-up cockpit (demo)
+/* Smaran, diabetes follow-up cockpit
    All data below is fictional, for demonstration only. */
 
-const patients = [
+const API = window.location.port === '8000'
+  ? ''
+  : window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000'
+    : '';
+
+const CONVEX_URL = (document.querySelector('meta[name="convex-url"]') || {}).content || '';
+let overdueDays = 90;
+let convexClient = null;
+let convexApi = null;
+
+const FALLBACK_PATIENTS = [
   {
     id: 'BR-10482', name: 'Madhumita Ghosh', age: 57, phone: '•••• 1824', lang: 'bn',
     status: 'overdue', label: 'Overdue 148 days',
     last: '16 May 2025', next: '16 Aug 2025', reason: '~5 months since last visit',
     conf: 98, ids: 2,
-    a1c: [
-      { d: 'Nov 2024', v: 7.1 },
-      { d: 'Feb 2025', v: 7.8 },
-      { d: 'May 2025', v: 8.9 }
-    ],
+    a1c: [{ d: 'Nov 2024', v: 7.1 }, { d: 'Feb 2025', v: 7.8 }, { d: 'May 2025', v: 8.9 }],
     signals: [
       { text: 'No clinic activity recorded for about 5 months.' },
       { text: 'Two record IDs merged into one patient view.', conf: 98, sub: 'Matched on phone number + Bengali name spelling.' },
       { text: '3 HbA1c results on file across the last year.' }
     ],
-    events: [
-      ['16 May 2025', 'HbA1c · 8.9%', 'Up from 7.8% at the previous check'],
-      ['16 May 2025', 'Billing record · OPD visit', 'Returned for medication refill'],
-      ['12 Feb 2025', 'HbA1c · 7.8%', 'Lab result linked from AKTIV']
-    ],
-    msg: {
-      en: "Hello Madhumita, our records show it has been a while since your last visit to Barasat clinic on 16 May 2025 — your routine diabetes follow-up is now due. Reply 1 and our team will help you book a convenient time this week.",
-      bn: "নমস্কার মধুমিতা, আমাদের রেকর্ড অনুযায়ী ১৬ মে ২০২৫-এ Barasat clinic-এ আপনার শেষ ভিজিটের পর বেশ কিছুদিন হয়ে গেছে — আপনার নিয়মিত ডায়াবেটিস ফলো-আপের সময় হয়েছে। এই সপ্তাহে সুবিধাজনক সময় বুক করতে ১ রিপ্লাই করুন।"
-    }
+    events: [['16 May 2025', 'HbA1c · 8.9%', 'Up from 7.8% at the previous check'], ['16 May 2025', 'Billing record · OPD visit', 'Returned for medication refill'], ['12 Feb 2025', 'HbA1c · 7.8%', 'Lab result linked from AKTIV']],
+    msg: { en: "Hello Madhumita, our records show it has been a while since your last visit to Barasat clinic on 16 May 2025. Your routine diabetes follow-up is now due. Reply 1 and our team will help you book a convenient time this week.", bn: "নমস্কার মধুমিতা, আমাদের রেকর্ড অনুযায়ী ১৬ মে ২০২৫-এ Barasat clinic-এ আপনার শেষ ভিজিটের পর বেশ কিছুদিন হয়ে গেছে. আপনার নিয়মিত ডায়াবেটিস ফলো-আপের সময় হয়েছে। এই সপ্তাহে সুবিধাজনক সময় বুক করতে ১ রিপ্লাই করুন।" }
   },
   {
     id: 'BR-08831', name: 'Subir Dutta', age: 64, phone: '•••• 4408', lang: 'en',
     status: 'overdue', label: 'Overdue 121 days',
     last: '12 Jun 2025', next: '12 Sep 2025', reason: 'Overdue · no recent refill',
     conf: 96, ids: 2,
-    a1c: [
-      { d: 'Dec 2024', v: 8.1 },
-      { d: 'Mar 2025', v: 8.7 },
-      { d: 'Jun 2025', v: 9.4 }
-    ],
-    signals: [
-      { text: 'No pharmacy refill logged since June 2025.' },
-      { text: 'Two record IDs merged into one patient view.', conf: 96, sub: 'Matched on phone number + name.' },
-      { text: 'Past the clinic’s 90-day overdue threshold.' }
-    ],
-    events: [
-      ['12 Jun 2025', 'HbA1c · 9.4%', 'Above the clinic follow-up threshold'],
-      ['12 Jun 2025', 'Lipid panel · completed', 'LDL 142 mg/dL'],
-      ['04 Mar 2025', 'HbA1c · 8.7%', 'Lab result linked from AKTIV']
-    ],
-    msg: {
-      en: "Hello Subir, it has been about 4 months since your last visit to Barasat clinic (12 Jun 2025) and your diabetes follow-up is now overdue. Reply 1 and our team will call to arrange a convenient time.",
-      bn: "নমস্কার সুবীর, Barasat clinic-এ আপনার শেষ ভিজিটের (১২ জুন ২০২৫) পর প্রায় ৪ মাস হয়ে গেছে এবং আপনার ডায়াবেটিস ফলো-আপ এখন বকেয়া। সুবিধাজনক সময় ঠিক করতে ১ রিপ্লাই করুন, আমরা ফোন করব।"
-    }
+    a1c: [{ d: 'Dec 2024', v: 8.1 }, { d: 'Mar 2025', v: 8.7 }, { d: 'Jun 2025', v: 9.4 }],
+    signals: [{ text: 'No pharmacy refill logged since June 2025.' }, { text: 'Two record IDs merged into one patient view.', conf: 96, sub: 'Matched on phone number + name.' }, { text: 'Past the clinic’s 90-day overdue threshold.' }],
+    events: [['12 Jun 2025', 'HbA1c · 9.4%', 'Above the clinic follow-up threshold'], ['12 Jun 2025', 'Lipid panel · completed', 'LDL 142 mg/dL'], ['04 Mar 2025', 'HbA1c · 8.7%', 'Lab result linked from AKTIV']],
+    msg: { en: "Hello Subir, it has been about 4 months since your last visit to Barasat clinic (12 Jun 2025) and your diabetes follow-up is now overdue. Reply 1 and our team will call to arrange a convenient time.", bn: "নমস্কার সুবীর, Barasat clinic-এ আপনার শেষ ভিজিটের (১২ জুন ২০২৫) পর প্রায় ৪ মাস হয়ে গেছে এবং আপনার ডায়াবেটিস ফলো-আপ এখন বকেয়া। সুবিধাজনক সময় ঠিক করতে ১ রিপ্লাই করুন, আমরা ফোন করব।" }
   },
   {
     id: 'BR-11602', name: 'Nasima Khatun', age: 49, phone: '•••• 9072', lang: 'bn',
     status: 'slipping', label: 'Pattern slipping',
     last: '18 Jan 2026', next: '18 Apr 2026', reason: 'Returned after a long gap',
     conf: 94, ids: 2,
-    a1c: [
-      { d: 'Jul 2023', v: 7.0 },
-      { d: 'Oct 2024', v: 7.2 },
-      { d: 'Jan 2026', v: 8.1 }
-    ],
-    signals: [
-      { text: 'Returned in January after a 15-month gap.' },
-      { text: 'Two record IDs merged into one patient view.', conf: 94, sub: 'Matched on phone number + Bengali name spelling.' },
-      { text: 'Longest interval between visits in this record.' }
-    ],
-    events: [
-      ['18 Jan 2026', 'HbA1c · 8.1%', 'Returned after a 15-month gap'],
-      ['18 Jan 2026', 'Record linked', 'Phone and Bengali name matched'],
-      ['10 Oct 2024', 'HbA1c · 7.2%', 'Last completed follow-up']
-    ],
-    msg: {
-      en: "Hello Nasima, you returned to Barasat clinic in January after a long gap — to keep your diabetes follow-ups on track, your next routine visit is due this month. Reply 1 if you would like us to call you.",
-      bn: "নমস্কার নাসিমা, অনেকদিন পর জানুয়ারিতে আপনি Barasat clinic-এ ফিরে এসেছিলেন — আপনার ডায়াবেটিস ফলো-আপ নিয়মিত রাখতে এই মাসে পরবর্তী ভিজিটের সময় হয়েছে। আমরা ফোন করলে ১ রিপ্লাই করুন।"
-    }
+    a1c: [{ d: 'Jul 2023', v: 7.0 }, { d: 'Oct 2024', v: 7.2 }, { d: 'Jan 2026', v: 8.1 }],
+    signals: [{ text: 'Returned in January after a 15-month gap.' }, { text: 'Two record IDs merged into one patient view.', conf: 94, sub: 'Matched on phone number + Bengali name spelling.' }, { text: 'Longest interval between visits in this record.' }],
+    events: [['18 Jan 2026', 'HbA1c · 8.1%', 'Returned after a 15-month gap'], ['18 Jan 2026', 'Record linked', 'Phone and Bengali name matched'], ['10 Oct 2024', 'HbA1c · 7.2%', 'Last completed follow-up']],
+    msg: { en: "Hello Nasima, you returned to Barasat clinic in January after a long gap. To keep your diabetes follow-ups on track, your next routine visit is due this month. Reply 1 if you would like us to call you.", bn: "নমস্কার নাসিমা, অনেকদিন পর জানুয়ারিতে আপনি Barasat clinic-এ ফিরে এসেছিলেন. আপনার ডায়াবেটিস ফলো-আপ নিয়মিত রাখতে এই মাসে পরবর্তী ভিজিটের সময় হয়েছে। আমরা ফোন করলে ১ রিপ্লাই করুন।" }
   },
   {
     id: 'BR-09544', name: 'Arindam Sen', age: 41, phone: '•••• 6619', lang: 'en',
     status: 'due', label: 'Due in 8 days',
     last: '03 Jul 2026', next: '11 Oct 2026', reason: 'Routine recall',
     conf: 99, ids: 1,
-    a1c: [
-      { d: 'Dec 2025', v: 7.0 },
-      { d: 'Apr 2026', v: 6.9 },
-      { d: 'Jul 2026', v: 6.8 }
-    ],
-    signals: [
-      { text: 'On schedule — 3 visits in the last 12 months.' },
-      { text: 'Single record ID — no merge needed.', conf: 99, sub: 'High-confidence identity match.' },
-      { text: 'Routine recall window opens in about a week.' }
-    ],
-    events: [
-      ['03 Jul 2026', 'HbA1c · 6.8%', 'Stable at last follow-up'],
-      ['03 Jul 2026', 'BP · 128/82', 'Routine review'],
-      ['08 Apr 2026', 'HbA1c · 6.9%', 'Lab result linked from AKTIV']
-    ],
-    msg: {
-      en: "Hello Arindam, your next routine diabetes check at Barasat clinic is coming up in about a week (due 11 Oct 2026). You have kept your recent visits on schedule — reply 1 to confirm a convenient time.",
-      bn: "নমস্কার অরিন্দম, Barasat clinic-এ আপনার পরবর্তী নিয়মিত ডায়াবেটিস চেক আর প্রায় এক সপ্তাহ পরে (১১ অক্টোবর ২০২৬)। আপনি সাম্প্রতিক ভিজিটগুলি সময়মতো রেখেছেন — সুবিধাজনক সময় নিশ্চিত করতে ১ রিপ্লাই করুন।"
-    }
+    a1c: [{ d: 'Dec 2025', v: 7.0 }, { d: 'Apr 2026', v: 6.9 }, { d: 'Jul 2026', v: 6.8 }],
+    signals: [{ text: 'On schedule. 3 visits in the last 12 months.' }, { text: 'Single record ID. No merge needed.', conf: 99, sub: 'High-confidence identity match.' }, { text: 'Routine recall window opens in about a week.' }],
+    events: [['03 Jul 2026', 'HbA1c · 6.8%', 'Stable at last follow-up'], ['03 Jul 2026', 'BP · 128/82', 'Routine review'], ['08 Apr 2026', 'HbA1c · 6.9%', 'Lab result linked from AKTIV']],
+    msg: { en: "Hello Arindam, your next routine diabetes check at Barasat clinic is coming up in about a week (due 11 Oct 2026). You have kept your recent visits on schedule. Reply 1 to confirm a convenient time.", bn: "নমস্কার অরিন্দম, Barasat clinic-এ আপনার পরবর্তী নিয়মিত ডায়াবেটিস চেক আর প্রায় এক সপ্তাহ পরে (১১ অক্টোবর ২০২৬)। আপনি সাম্প্রতিক ভিজিটগুলি সময়মতো রেখেছেন. সুবিধাজনক সময় নিশ্চিত করতে ১ রিপ্লাই করুন।" }
   },
   {
     id: 'BR-07319', name: 'Bimal Roy', age: 71, phone: '•••• 2380', lang: 'en',
     status: 'overdue', label: 'Overdue 96 days',
     last: '29 Jun 2025', next: '29 Sep 2025', reason: 'Multiple missed recalls',
     conf: 97, ids: 2,
-    a1c: [
-      { d: 'Dec 2024', v: 8.6 },
-      { d: 'Mar 2025', v: 9.1 },
-      { d: 'Jun 2025', v: 10.2 }
-    ],
-    signals: [
-      { text: 'Three recall windows have passed with no activity.' },
-      { text: 'Two record IDs merged into one patient view.', conf: 97, sub: 'Matched on phone number + name.' },
-      { text: 'Oldest overdue entry in today’s queue.' }
-    ],
-    events: [
-      ['29 Jun 2025', 'HbA1c · 10.2%', 'Highest recorded result'],
-      ['29 Jun 2025', 'Follow-up missed', 'No billing or lab activity since'],
-      ['15 Mar 2025', 'HbA1c · 9.1%', 'Lab result linked from AKTIV']
-    ],
-    msg: {
-      en: "Hello Bimal, our records show a few missed follow-ups since your last visit on 29 Jun 2025. The Barasat diabetes team would like to check in — reply 1 and we will call you.",
-      bn: "নমস্কার বিমল, ২৯ জুন ২০২৫-এ আপনার শেষ ভিজিটের পর কয়েকটি ফলো-আপ বাদ গেছে বলে আমাদের রেকর্ডে দেখা যাচ্ছে। Barasat ডায়াবেটিস টিম আপনার খোঁজ নিতে চায় — ১ রিপ্লাই করুন, আমরা ফোন করব।"
-    }
+    a1c: [{ d: 'Dec 2024', v: 8.6 }, { d: 'Mar 2025', v: 9.1 }, { d: 'Jun 2025', v: 10.2 }],
+    signals: [{ text: 'Three recall windows have passed with no activity.' }, { text: 'Two record IDs merged into one patient view.', conf: 97, sub: 'Matched on phone number + name.' }, { text: 'Oldest overdue entry in today’s queue.' }],
+    events: [['29 Jun 2025', 'HbA1c · 10.2%', 'Highest recorded result'], ['29 Jun 2025', 'Follow-up missed', 'No billing or lab activity since'], ['15 Mar 2025', 'HbA1c · 9.1%', 'Lab result linked from AKTIV']],
+    msg: { en: "Hello Bimal, our records show a few missed follow-ups since your last visit on 29 Jun 2025. The Barasat diabetes team would like to check in. Reply 1 and we will call you.", bn: "নমস্কার বিমল, ২৯ জুন ২০২৫-এ আপনার শেষ ভিজিটের পর কয়েকটি ফলো-আপ বাদ গেছে বলে আমাদের রেকর্ডে দেখা যাচ্ছে। Barasat ডায়াবেটিস টিম আপনার খোঁজ নিতে চায়. ১ রিপ্লাই করুন, আমরা ফোন করব।" }
   },
   {
     id: 'BR-12177', name: 'Rina Das', age: 52, phone: '•••• 3125', lang: 'bn',
     status: 'slipping', label: 'Pattern slipping',
     last: '07 Dec 2025', next: '07 Mar 2026', reason: '2nd recall missed',
     conf: 95, ids: 2,
-    a1c: [
-      { d: 'Apr 2025', v: 6.9 },
-      { d: 'Aug 2025', v: 7.1 },
-      { d: 'Dec 2025', v: 7.9 }
-    ],
-    signals: [
-      { text: 'Second recall missed in a row.' },
-      { text: 'Two record IDs merged into one patient view.', conf: 95, sub: 'Matched on phone number + Bengali name spelling.' },
-      { text: 'Time between visits is getting longer.' }
-    ],
-    events: [
-      ['07 Dec 2025', 'HbA1c · 7.9%', 'Up from 7.1%'],
-      ['07 Dec 2025', 'Follow-up completed', 'Record linked across two IDs'],
-      ['23 Aug 2025', 'HbA1c · 7.1%', 'Lab result linked from AKTIV']
-    ],
-    msg: {
-      en: "Hello Rina, it has been a few months since your visit on 07 Dec 2025 and your next diabetes follow-up is now due. Can you come to Barasat clinic this week? Reply 1.",
-      bn: "নমস্কার রিনা, ০৭ ডিসেম্বর ২০২৫-এ আপনার ভিজিটের পর কয়েক মাস হয়ে গেছে এবং আপনার পরবর্তী ডায়াবেটিস ফলো-আপের সময় হয়েছে। এই সপ্তাহে Barasat clinic-এ আসতে পারবেন? ১ রিপ্লাই করুন।"
-    }
+    a1c: [{ d: 'Apr 2025', v: 6.9 }, { d: 'Aug 2025', v: 7.1 }, { d: 'Dec 2025', v: 7.9 }],
+    signals: [{ text: 'Second recall missed in a row.' }, { text: 'Two record IDs merged into one patient view.', conf: 95, sub: 'Matched on phone number + Bengali name spelling.' }, { text: 'Time between visits is getting longer.' }],
+    events: [['07 Dec 2025', 'HbA1c · 7.9%', 'Up from 7.1%'], ['07 Dec 2025', 'Follow-up completed', 'Record linked across two IDs'], ['23 Aug 2025', 'HbA1c · 7.1%', 'Lab result linked from AKTIV']],
+    msg: { en: "Hello Rina, it has been a few months since your visit on 07 Dec 2025 and your next diabetes follow-up is now due. Can you come to Barasat clinic this week? Reply 1.", bn: "নমস্কার রিনা, ০৭ ডিসেম্বর ২০২৫-এ আপনার ভিজিটের পর কয়েক মাস হয়ে গেছে এবং আপনার পরবর্তী ডায়াবেটিস ফলো-আপের সময় হয়েছে। এই সপ্তাহে Barasat clinic-এ আসতে পারবেন? ১ রিপ্লাই করুন।" }
   }
 ];
+
+let patients = [...FALLBACK_PATIENTS];
+let apiAvailable = false;
+let currentDetail = null;
 
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 let active = 'all';
 let selected = null;
-let msgLang = 'bn';           // language currently shown in the outreach draft
-let defaultLang = 'auto';     // from settings drawer
+let msgLang = 'bn';
+let defaultLang = 'auto';
+
+/* ---------- API helpers ---------- */
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
+function parseDay(value) {
+  if (!value) return null;
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+    const [y, m, d] = text.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function present(p) {
+  const day = parseDay(p.next);
+  if (!day) return p;
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((start - day) / 86400000);
+  let status = p.status;
+  let label = p.label;
+  if (days > overdueDays) {
+    status = 'overdue';
+    label = `Overdue ${days} days`;
+  } else if (p.status === 'slipping') {
+    status = 'slipping';
+    label = days > 0 ? `Slipping, ${days} days past recall` : 'Pattern slipping';
+  } else if (days > 0) {
+    status = 'due';
+    label = `Due ${days} days ago`;
+  } else {
+    status = 'due';
+    label = `Due in ${Math.abs(days)} days`;
+  }
+  return { ...p, status, label };
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    ...opts,
+  });
+  if (!res.ok) {
+    const error = new Error(`API ${res.status}`);
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
+}
+
+async function getConvex() {
+  if (!CONVEX_URL) return null;
+  if (!convexClient) {
+    const browser = await import('https://esm.sh/convex@1.49.0/browser');
+    const server = await import('https://esm.sh/convex@1.49.0/server');
+    convexClient = new browser.ConvexClient(CONVEX_URL);
+    convexApi = server.anyApi;
+  }
+  return convexClient;
+}
+
+function mapApiPatient(p) {
+  const a1c = (p.a1c || []).map(l => ({ d: l.date, v: l.value }));
+  const trend = p.a1c_trend || {};
+  return {
+    id: p.id, name: p.name, age: p.age,
+    phone: p.phone_last4 ? `•••• ${p.phone_last4}` : '••••',
+    lang: p.lang, status: p.status, label: p.label,
+    last: p.last_visit || '', next: p.next_recall || '',
+    reason: p.recall_reason || '',
+    conf: p.confidence ? Math.round(p.confidence * 100) : null,
+    ids: p.linked_ids || 1,
+    a1c,
+    signals: (p.signals || []).map(s => ({
+      text: s.text,
+      conf: s.confidence ? Math.round(s.confidence * 100) : null,
+      sub: s.sub_text || null,
+    })),
+    events: (p.events || []).map(e => [e.date, e.title, e.detail]),
+    msg: p.outreach ? { en: p.outreach.en, bn: p.outreach.bn } : null,
+  };
+}
+
+async function loadPatients() {
+  try {
+    const data = await api('/api/patients');
+    patients = data.map(mapApiPatient).map(present);
+    apiAvailable = true;
+  } catch {
+    patients = FALLBACK_PATIENTS.map(present);
+    apiAvailable = false;
+  }
+  renderCounts();
+  renderList();
+}
+
+async function loadPatientDetail(id) {
+  if (!apiAvailable) {
+    const local = FALLBACK_PATIENTS.find(p => p.id === id);
+    return local ? present(local) : null;
+  }
+  try {
+    const data = await api(`/api/patients/${id}`);
+    return present(mapApiPatient(data));
+  } catch {
+    const local = FALLBACK_PATIENTS.find(p => p.id === id);
+    return local ? present(local) : null;
+  }
+}
 
 /* ---------- Sparkline ---------- */
 function sparkline(series, w, h, opts = {}) {
+  if (!series.length) return { svg: '', dir: 'flat' };
   const pad = opts.pad ?? 3;
   const sw = opts.stroke ?? 1.6;
   const vals = series.map(p => p.v);
@@ -196,6 +242,8 @@ function count(status) { return patients.filter(p => p.status === status).length
 function renderCounts() {
   $('#attention').textContent = patients.length;
   $('#overdue').textContent = count('overdue');
+  $('#slipping').textContent = count('slipping');
+  $('#dueSoon').textContent = count('due');
   $('#allCount').textContent = patients.length;
   $('#overdueCount').textContent = count('overdue');
   $('#slippingCount').textContent = count('slipping');
@@ -217,12 +265,12 @@ function renderList() {
 
   $('#patientList').innerHTML = rows.map(p => {
     const sp = sparkline(p.a1c, 74, 26);
-    return `<div class="patient ${selected === p.id ? 'selected' : ''}" data-id="${p.id}">
-      <span class="accent ${p.status}"></span>
+    return `<div class="patient ${selected === p.id ? 'selected' : ''}" data-id="${esc(p.id)}">
+      <span class="accent ${esc(p.status)}"></span>
       <div class="p-main">
-        <div class="patient-name">${p.name}</div>
-        <div class="patient-meta">${p.id} · ${p.phone} · ${p.age} yrs</div>
-        <span class="badge ${p.status}">${p.label}</span>
+        <div class="patient-name">${esc(p.name)}</div>
+        <div class="patient-meta">${esc(p.id)} · ${esc(p.phone)} · ${esc(p.age)} yrs</div>
+        <span class="badge ${esc(p.status)}">${esc(p.label)}</span>
       </div>
       <div class="p-trend">
         ${sp.svg}
@@ -232,72 +280,82 @@ function renderList() {
   }).join('');
 
   $$('.patient').forEach(el =>
-    el.onclick = () => renderDetail(patients.find(p => p.id === el.dataset.id))
+    el.onclick = async () => {
+      const detail = await loadPatientDetail(el.dataset.id);
+      if (detail) renderDetail(detail);
+    }
   );
 }
 
 /* ---------- Detail ---------- */
 function renderDetail(p) {
   selected = p.id;
+  currentDetail = p;
   renderList();
 
   msgLang = defaultLang === 'auto' ? p.lang : defaultLang;
 
-  const sp = sparkline(p.a1c, 300, 54, { pad: 6, stroke: 2 });
-  const first = p.a1c[0], latest = p.a1c[p.a1c.length - 1];
+  const series = p.a1c || [];
+  const sp = sparkline(series, 300, 54, { pad: 6, stroke: 2 });
+  const first = series[0], latest = series[series.length - 1];
+  const trendCard = series.length
+    ? `<div class="trend-card">
+      <div class="trend-head">
+        <span class="lbl">HbA1c trend</span>
+        <span class="meta">${series.length} results · ${TREND_WORD[sp.dir]}</span>
+      </div>
+      <div class="trend-plot">${sp.svg}</div>
+      <div class="trend-axis">
+        <span><b>${esc(first.v)}%</b> · ${esc(first.d)}</span>
+        <span><b>${esc(latest.v)}%</b> · ${esc(latest.d)}</span>
+      </div>
+    </div>`
+    : `<div class="trend-card"><p class="trend-empty">No HbA1c on file.</p></div>`;
 
-  const signals = p.signals.map(s => `
+  const signals = (p.signals || []).map(s => `
     <div class="signal">
       <span class="dot"></span>
       <div>
-        <p>${s.text}</p>
+        <p>${esc(s.text)}</p>
         ${s.conf ? `<div class="meter"><i style="width:${s.conf}%"></i></div><small>${s.conf}% record-match confidence</small>` : ''}
-        ${s.sub ? `<small>${s.sub}</small>` : ''}
+        ${s.sub ? `<small>${esc(s.sub)}</small>` : ''}
       </div>
     </div>`).join('');
 
-  const timeline = p.events.map(e =>
-    `<div class="event"><time>${e[0]}</time><strong>${e[1]}</strong><p>${e[2]}</p></div>`
+  const timeline = (p.events || []).map(e =>
+    `<div class="event"><time>${esc(e[0])}</time><strong>${esc(e[1])}</strong><p>${esc(e[2] || '')}</p></div>`
   ).join('');
+
+  const msgText = p.msg ? p.msg[msgLang] || p.msg.en || '' : '';
 
   $('#detail').innerHTML = `
     <div class="detail-top">
       <div>
-        <h2>${p.name}</h2>
-        <div class="detail-id">${p.id} · ${p.age} years · ${p.phone}</div>
+        <h2>${esc(p.name)}</h2>
+        <div class="detail-id">${esc(p.id)} · ${esc(p.age)} years · ${esc(p.phone)}</div>
       </div>
-      <span class="status-pill ${p.status}">${p.label}</span>
+      <span class="status-pill ${esc(p.status)}">${esc(p.label)}</span>
     </div>
 
-    <div class="trend-card">
-      <div class="trend-head">
-        <span class="lbl">HbA1c trend</span>
-        <span class="meta">${p.a1c.length} results · ${TREND_WORD[sp.dir]}</span>
-      </div>
-      <div class="trend-plot">${sp.svg}</div>
-      <div class="trend-axis">
-        <span><b>${first.v}%</b> · ${first.d}</span>
-        <span><b>${latest.v}%</b> · ${latest.d}</span>
-      </div>
-    </div>
+    ${trendCard}
 
     <div class="detail-grid">
-      <div><span>Last contact</span><b>${p.last}</b></div>
-      <div><span>Next recall</span><b>${p.next}</b></div>
-      <div><span>Reason to call</span><b>${p.reason}</b></div>
+      <div><span>Last contact</span><b>${esc(p.last)}</b></div>
+      <div><span>Next recall</span><b>${esc(p.next)}</b></div>
+      <div><span>Reason to call</span><b>${esc(p.reason)}</b></div>
     </div>
 
     <h3 class="block">What Smaran noticed</h3>
     <div class="signals">${signals}</div>
 
-    <h3 class="block">Linked records — one patient view</h3>
+    <h3 class="block">Linked records, one patient view</h3>
     <div class="timeline">${timeline}</div>
 
     <div class="callout">
       <div class="callout-head">
         <div class="lead">
           <h3>Suggested outreach</h3>
-          <span class="ai-chip">AI drafted</span>
+          <span class="ai-chip">Draft</span>
         </div>
         <span class="review-note">Human review required</span>
       </div>
@@ -307,14 +365,14 @@ function renderDetail(p) {
         <button data-lang="en" class="${msgLang === 'en' ? 'on' : ''}">English</button>
       </div>
 
-      <div class="message" id="draft">${p.msg[msgLang]}</div>
+      <div class="message" id="draft">${esc(msgText)}</div>
 
       <div class="msg-foot">
         <button class="regen" id="regen">
           <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M12 5V2L7 7l5 5V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-7Z"/></svg>
           Regenerate
         </button>
-        <span class="info-only">Information only — references visit history, not medical advice.</span>
+        <span class="info-only">Information only. References visit history, not medical advice.</span>
       </div>
 
       <div class="actions">
@@ -323,15 +381,112 @@ function renderDetail(p) {
       </div>
     </div>`;
 
-  // wire up detail controls
   $$('.lang-toggle button').forEach(b => b.onclick = () => {
     msgLang = b.dataset.lang;
-    $('#draft').textContent = p.msg[msgLang];
+    if (p.msg) $('#draft').textContent = p.msg[msgLang] || '';
     $$('.lang-toggle button').forEach(x => x.classList.toggle('on', x.dataset.lang === msgLang));
   });
-  $('#regen').onclick = () => toast('New draft generated · still needs human review');
-  $('#sendBtn').onclick = () => toast('Message queued for human approval');
-  $('#doneBtn').onclick = () => toast('Marked contacted · queue updated');
+
+  $('#regen').onclick = () => regenerateDraft(p);
+  $('#sendBtn').onclick = () => approveDraft(p);
+  $('#doneBtn').onclick = () => markContacted(p);
+}
+
+function showDraftError(text) {
+  const el = $('#draft');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('error');
+  el.classList.remove('loading');
+}
+
+async function regenerateDraft(p) {
+  const el = $('#draft');
+  el.classList.add('loading');
+  el.classList.remove('error');
+  el.textContent = 'Drafting...';
+  if (p.unsub) {
+    p.unsub();
+    p.unsub = null;
+  }
+  try {
+    if (CONVEX_URL) {
+      const client = await getConvex();
+      const result = await client.action(convexApi.draft.generate, { patientId: p.id });
+      if (!result || result.error) throw new Error(result && result.error ? result.error : 'Draft failed');
+      p.threadId = result.threadId;
+      p.msg = { en: result.en, bn: result.bn };
+      if (p.unsub) p.unsub();
+      try {
+        p.unsub = client.onUpdate(convexApi.drafts.latest, { patientId: p.id }, row => {
+          if (!row || selected !== p.id) return;
+          p.msg = { en: row.en, bn: row.bn };
+          const box = $('#draft');
+          if (box) box.textContent = p.msg[msgLang] || '';
+        });
+      } catch { /* the action result is already on screen */ }
+    } else if (apiAvailable) {
+      const draft = await api(`/api/outreach/${p.id}`, { method: 'POST' });
+      p.msg = { en: draft.en, bn: draft.bn };
+    } else {
+      throw new Error('offline');
+    }
+    el.textContent = p.msg[msgLang] || '';
+    el.classList.remove('error');
+    toast('New draft ready. A person still has to approve it.');
+  } catch (err) {
+    showDraftError(err && err.message === 'offline'
+      ? 'Draft generation needs a server. Please try again.'
+      : 'Draft generation failed. Please try again.');
+    toast('Draft generation failed');
+  }
+  el.classList.remove('loading');
+}
+
+async function approveDraft(p) {
+  try {
+    if (p.threadId && CONVEX_URL) {
+      const client = await getConvex();
+      const result = await client.mutation(convexApi.drafts.approve, { patientId: p.id });
+      if (!result || result.error) throw Object.assign(new Error('none'), { status: 409 });
+      toast('Approved. A person still has to send it.');
+      return;
+    }
+    if (!apiAvailable) {
+      toast('No server is connected, so nothing was approved.');
+      return;
+    }
+    await api(`/api/outreach/${p.id}/approve`, { method: 'POST' });
+    toast('Approved. A person still has to send it.');
+  } catch (err) {
+    toast(err && err.status === 409 ? 'No draft to approve.' : 'Approval failed. Try again.');
+  }
+}
+
+function clearDetail() {
+  selected = null;
+  currentDetail = null;
+  renderCounts();
+  renderList();
+  $('#detail').innerHTML = '<div class="empty"><span class="empty-mark" aria-hidden="true">→</span><h2>Select a person</h2><p>Choose a patient from the queue to review their timeline and next action.</p></div>';
+}
+
+async function markContacted(p) {
+  if (apiAvailable) {
+    try {
+      await api(`/api/patients/${p.id}/contact`, { method: 'POST' });
+      await loadPatients();
+      clearDetail();
+      toast('Marked contacted.');
+      return;
+    } catch {
+      toast('Could not save contacted. Try again.');
+      return;
+    }
+  }
+  patients = patients.filter(pt => pt.id !== p.id);
+  clearDetail();
+  toast('Marked contacted on this page only.');
 }
 
 /* ---------- Toast ---------- */
@@ -345,10 +500,32 @@ function toast(t) {
 }
 
 /* ---------- Settings drawer ---------- */
-function openDrawer() {
+function selectOption(select, value) {
+  const wanted = String(value).toLowerCase();
+  const match = [...select.options].find(option => {
+    const text = option.value || option.textContent;
+    return text.toLowerCase() === wanted || String(parseInt(text, 10)) === wanted;
+  });
+  if (match) select.value = match.value || match.textContent;
+}
+
+async function openDrawer() {
   $('#drawer').classList.add('show');
   $('#drawer').setAttribute('aria-hidden', 'false');
   $('#drawerBackdrop').classList.add('show');
+  if (!apiAvailable) return;
+  try {
+    const settings = await api('/api/settings');
+    overdueDays = settings.overdue_days || 90;
+    selectOption($('#setSync'), settings.sync_schedule);
+    selectOption($('#setLang'), settings.default_lang);
+    selectOption($('#setThreshold'), settings.overdue_days);
+    selectOption($('#setChannel'), settings.outreach_channel);
+    defaultLang = $('#setLang').value;
+    patients = patients.map(present);
+    renderCounts();
+    renderList();
+  } catch { /* keep the values already on the form */ }
 }
 function closeDrawer() {
   $('#drawer').classList.remove('show');
@@ -362,12 +539,31 @@ $('#drawerCancel').onclick = closeDrawer;
 $('#drawerBackdrop').onclick = closeDrawer;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
-$('#drawerSave').onclick = () => {
+$('#drawerSave').onclick = async () => {
   defaultLang = $('#setLang').value;
-  $('#syncTime').textContent = 'Last run ' + ($('#setSync').value === 'Hourly' ? '06:10' : $('#setSync').value);
+  overdueDays = parseInt($('#setThreshold').value, 10) || 90;
+  const syncVal = $('#setSync').value;
+  let savedOnServer = false;
+  if (apiAvailable) {
+    try {
+      await api('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          sync_schedule: syncVal,
+          default_lang: defaultLang,
+          overdue_days: overdueDays,
+          outreach_channel: $('#setChannel').value.toLowerCase(),
+        }),
+      });
+      savedOnServer = true;
+    } catch { savedOnServer = false; }
+  }
+  patients = patients.map(present);
+  renderCounts();
+  renderList();
   closeDrawer();
-  toast('Settings saved (demo)');
-  if (selected) renderDetail(patients.find(p => p.id === selected));
+  toast(savedOnServer ? 'Settings saved on the clinic record.' : 'Settings kept on this page only.');
+  if (selected && currentDetail) renderDetail(present(currentDetail));
 };
 
 /* ---------- Filters / search / sync ---------- */
@@ -378,9 +574,40 @@ $$('.chip').forEach(c => c.onclick = () => {
   renderList();
 });
 $('#search').oninput = renderList;
-$('#runSync').onclick = () => toast('Nightly sync complete · 18 records linked');
-$('#filterBtn').onclick = () => toast('Filters are set to active follow-up risk');
+
+$('#runSync').onclick = async () => {
+  if (!apiAvailable) {
+    toast('Sync needs the clinic server.');
+    return;
+  }
+
+  const btn = $('#runSync');
+  btn.disabled = true;
+  btn.classList.add('syncing');
+  const strip = $('#aiSummary');
+  strip.textContent = 'Connecting to AKTIV...';
+  let linkingTimer = setTimeout(() => { strip.textContent = 'Linking records...'; }, 1000);
+
+  try {
+    const result = await api('/api/sync', { method: 'POST' });
+    clearTimeout(linkingTimer);
+    linkingTimer = null;
+    strip.textContent = `Linked ${result.records_linked} records and wrote ${result.signals_generated} signals.`;
+    $('#syncTime').textContent = 'Last run ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    await loadPatients();
+    toast(`Sync complete. ${result.records_linked} records linked. ${result.signals_generated} signals.`);
+  } catch {
+    clearTimeout(linkingTimer);
+    strip.textContent = 'Sync failed. The list is unchanged.';
+    toast('Sync failed. Try again.');
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('syncing');
+};
+
+/* ---------- Dynamic date ---------- */
+document.querySelector('.clinic b').textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 /* ---------- Init ---------- */
-renderCounts();
-renderList();
+loadPatients();

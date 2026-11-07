@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Smaran — Diabetes follow-up cockpit</title>
+  <title>Smaran: Diabetes follow-up cockpit</title>
+  <meta name="convex-url" content="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,7 +17,6 @@
       </div>
     </div>
     <div class="clinic">
-      <span class="live" aria-hidden="true"></span>
       <span>Barasat Diabetes &amp; Diagnostics</span>
       <b>03 Oct 2026</b>
     </div>
@@ -26,7 +26,7 @@
   </header>
 
   <main>
-    <div class="demo-note">Demo mode — all names, record IDs, dates, phone fragments and values shown here are fictional, for demonstration only.</div>
+    <div class="demo-note">Demo mode. All names, record IDs, dates, phone fragments, and values shown here are fictional.</div>
 
     <section class="hero">
       <div class="hero-text">
@@ -41,31 +41,29 @@
     </section>
 
     <section class="ai-strip" id="aiStrip">
-      <span class="ai-badge"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12 2l1.9 6.3L20 10l-6.1 1.7L12 18l-1.9-6.3L4 10l6.1-1.7L12 2Z"/></svg> AI</span>
-      <p class="ai-text" id="aiSummary">Smaran reviewed <b>318</b> active records overnight — linked <b>18</b> new lab results and surfaced <b>2</b> slipping follow-up patterns.</p>
-      <span class="ai-ts">Analysis 06:10 · automatic</span>
+      <p class="ai-text" id="aiSummary">Sync has not run in this session.</p>
     </section>
 
     <section class="metrics">
       <article>
         <span>Needs attention</span>
-        <strong id="attention">—</strong>
+        <strong id="attention"></strong>
         <small>due or overdue</small>
       </article>
       <article>
         <span>Overdue &gt; 90 days</span>
-        <strong id="overdue">—</strong>
+        <strong id="overdue"></strong>
         <small>priority queue</small>
       </article>
       <article>
-        <span>Returned this month</span>
-        <strong>24</strong>
-        <small>follow-up completed</small>
+        <span>Slipping</span>
+        <strong id="slipping"></strong>
+        <small>pattern slipping</small>
       </article>
       <article>
-        <span>Auto-linked records</span>
-        <strong>92%</strong>
-        <small>of active patients</small>
+        <span>Due soon</span>
+        <strong id="dueSoon"></strong>
+        <small>under the 90 day mark</small>
       </article>
     </section>
 
@@ -73,10 +71,6 @@
       <aside class="queue">
         <div class="queue-head">
           <h2>Today's follow-up list</h2>
-          <button class="filter-btn" id="filterBtn">
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4-2v-4L3 5Z"/></svg>
-            Filter
-          </button>
         </div>
         <div class="search">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M10 4a6 6 0 1 1-4.24 10.24l-3 3-1.42-1.42 3-3A6 6 0 0 1 10 4Zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg>
@@ -140,11 +134,7 @@
           <option>SMS</option>
         </select>
       </label>
-      <label class="toggle">
-        <input type="checkbox" id="setApproval" checked disabled>
-        <span>Require human approval before any message is sent</span>
-      </label>
-      <p class="drawer-note">Demo settings — changes are not saved between sessions.</p>
+      <p class="drawer-note" id="settingsNote">Drafts stay unsent until you approve them. Settings are saved on the clinic record when the server is connected. Otherwise they stay on this page only.</p>
     </div>
     <div class="drawer-foot">
       <button class="secondary" id="drawerCancel">Cancel</button>

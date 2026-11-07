@@ -1,0 +1,16 @@
+{
+  "name": "smaran",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.45",
+    "@convex-dev/agent": "^0.7.9",
+    "@convex-dev/ai-sdk-provider": "^0.3.0",
+    "convex": "^1.46.0",
+    "convex-helpers": "^0.1.127",
+    "zod": "^3.25.76"
+  }
+}

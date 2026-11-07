@@ -1,5 +1,5 @@
 :root{
-  --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --bg: #f4f6f7;
   --surface: #ffffff;
   --ink: #16303f;
@@ -56,7 +56,6 @@ button{font-family:inherit;cursor:pointer}
 .brand-text span{display:block;color:var(--faint);font-size:11px;margin-top:1px}
 .clinic{display:flex;align-items:center;gap:9px;color:var(--ink-soft);font-size:13px;flex:1}
 .clinic b{font-weight:500;color:var(--faint);margin-left:8px}
-.live{width:8px;height:8px;border-radius:50%;background:#2f9e7a;border:2px solid #bfe6d7}
 .icon-btn{
   border:1px solid transparent;background:transparent;color:var(--muted);
   width:36px;height:36px;border-radius:8px;
@@ -112,16 +111,8 @@ main{max-width:1440px;margin:auto}
   align-items:center;
   gap:14px;
 }
-.ai-badge{
-  display:inline-flex;align-items:center;gap:5px;
-  background:var(--teal-tint);color:var(--teal-dark);
-  border:1px solid var(--teal-border);
-  font-size:11px;font-weight:700;letter-spacing:.02em;
-  padding:4px 8px;border-radius:7px;flex-shrink:0;
-}
 .ai-text{margin:0;font-size:13px;color:var(--ink-soft);flex:1}
 .ai-text b{color:var(--ink);font-weight:650}
-.ai-ts{font-size:11px;color:var(--faint);flex-shrink:0}
 
 /* ---------- Metrics ---------- */
 .metrics{
@@ -148,16 +139,8 @@ main{max-width:1440px;margin:auto}
 }
 
 /* ---------- Queue ---------- */
-.queue-head{padding:20px 22px 15px;display:flex;justify-content:space-between;align-items:center}
+.queue-head{padding:20px 22px 15px}
 .queue-head h2{font-size:17px;margin:0;color:var(--ink);letter-spacing:-.01em;font-weight:600}
-.filter-btn{
-  border:1px solid var(--line);background:var(--surface);
-  border-radius:8px;color:var(--ink-soft);
-  padding:7px 11px;font-size:12.5px;
-  display:inline-flex;align-items:center;gap:6px;
-  transition:border-color .12s,background .12s;
-}
-.filter-btn:hover{border-color:#cfd8dd;background:var(--line-soft)}
 
 .search{
   margin:0 20px;border:1px solid var(--line);border-radius:8px;
@@ -357,6 +340,19 @@ h3.block{font-size:14px;color:var(--ink);font-weight:600;margin:24px 0 12px;lett
 }
 .toast.show{opacity:1;transform:none}
 
+/* ---------- Loading / Sync states ---------- */
+.message.loading{opacity:.5;animation:pulse 1.2s ease-in-out infinite}
+.message.error{border-color:var(--red);background:var(--red-tint)}
+.draft-error{color:var(--red);font-size:12.5px;font-weight:500}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:.3}}
+.syncing .ic{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.primary:disabled{opacity:.6;cursor:wait}
+.trend-empty{margin:8px 0 0;color:var(--muted);font-size:13px}
+@media (prefers-reduced-motion: reduce){
+  .message.loading,.syncing .ic{animation:none}
+}
+
 /* ---------- Responsive ---------- */
 @media(max-width:980px){
   .workspace{grid-template-columns:1fr;padding:0 18px 40px}
@@ -368,7 +364,6 @@ h3.block{font-size:14px;color:var(--ink);font-weight:600;margin:24px 0 12px;lett
   .clinic{display:none}
   .hero{padding:24px 18px 16px;flex-direction:column;align-items:flex-start;gap:18px}
   .ai-strip{margin:0 18px 18px;flex-direction:column;align-items:flex-start;gap:8px}
-  .ai-ts{align-self:flex-start}
   .metrics{margin:0 18px 18px;grid-template-columns:1fr 1fr}
   .demo-note{margin:16px 18px 0}
 }
