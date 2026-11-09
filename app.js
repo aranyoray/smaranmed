@@ -81,6 +81,7 @@ const FALLBACK_PATIENTS = [
 
 let patients = [...FALLBACK_PATIENTS];
 let apiAvailable = false;
+let offlineLoaded = false;
 let currentDetail = null;
 let keywords = null;
 let nlIds = null;
@@ -224,7 +225,9 @@ async function loadPatients() {
     patients = data.map(mapApiPatient).map(present);
     apiAvailable = true;
   } catch (err) {
-    patients = FALLBACK_PATIENTS.map(withLocalFields).map(present);
+    // Already offline: keep the page's own changes instead of resetting the demo.
+    if (apiAvailable || !offlineLoaded) patients = FALLBACK_PATIENTS.map(withLocalFields).map(present);
+    offlineLoaded = true;
     apiAvailable = false;
     if (err && err.status === 401) toast('Enter the staff key in Settings to load the clinic queue.');
   }
