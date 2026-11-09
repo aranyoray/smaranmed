@@ -19,15 +19,15 @@ INTENT_ORDER = ["escalate", "deceased", "opt_out", "wrong_number", "moved", "els
 
 # intent -> (leave the call queue?, queue label)
 ACTIONS = {
-    "escalate": (False, "Escalated to doctor"),
+    "escalate": (False, "Escalated to clinician"),
     "deceased": (True, "Reported deceased"),
-    "opt_out": (True, "Asked to stop messages"),
+    "opt_out": (True, "Opted out of messages"),
     "wrong_number": (True, "Wrong number"),
-    "moved": (True, "Moved away"),
-    "elsewhere": (True, "Testing elsewhere"),
-    "callback": (False, "Asked for a call back"),
-    "coming": (True, "Will come in"),
-    "unclear": (False, "Reply needs a person to read"),
+    "moved": (True, "Relocated"),
+    "elsewhere": (True, "Testing at another facility"),
+    "callback": (False, "Call-back requested"),
+    "coming": (True, "Visit confirmed"),
+    "unclear": (False, "Requires manual review"),
 }
 
 

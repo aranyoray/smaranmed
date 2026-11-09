@@ -93,7 +93,7 @@ def _lab_models(labs: list) -> List[LabResult]:
 
 def _status_label(p: dict, threshold: int):
     if p.get("escalated_at"):
-        return p.get("status") or "due", "Escalated to doctor"
+        return p.get("status") or "due", "Escalated to clinician"
     status, label = recall_presentation(p.get("next_recall"), p.get("status") or "due", threshold)
     return status, label or (p.get("label") or "")
 
@@ -210,7 +210,7 @@ def log_reply(patient_id: str, body: ReplyIn):
     db.record_reply(patient_id, body.text, plan)
     db.insert_event(patient_id, f"Reply · {plan['label']}", body.text[:140], "reply")
     if plan["escalate"]:
-        db.insert_signal(patient_id, "Reply needs the doctor's attention.", sub_text=f"Mentioned: {plan['matched'] or 'see reply'}.", source="system")
+        db.insert_signal(patient_id, "Reply flagged for clinician review.", sub_text=f"Mentioned: {plan['matched'] or 'see reply'}.", source="system")
     logger.info("Reply for %s classified %s by %s", patient_id, plan["intent"], plan["by"])
     return ReplyResult(**plan)
 

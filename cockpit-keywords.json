@@ -2,7 +2,7 @@
   "_note": "Shared by backend/replies.py, backend/search.py and app.js. Lowercase. Escalation always wins over every other intent.",
   "replies": {
     "escalate": {
-      "label": "Escalate to doctor",
+      "label": "Escalate to clinician",
       "words": [
         "chest pain",
         "breathless",
@@ -72,7 +72,7 @@
       ]
     },
     "opt_out": {
-      "label": "Asked to stop messages",
+      "label": "Opted out of messages",
       "words": [
         "stop",
         "unsubscribe",
@@ -98,7 +98,7 @@
       ]
     },
     "moved": {
-      "label": "Moved away",
+      "label": "Relocated",
       "words": [
         "moved",
         "shifted",
@@ -113,7 +113,7 @@
       ]
     },
     "elsewhere": {
-      "label": "Testing elsewhere",
+      "label": "Testing at another facility",
       "words": [
         "other lab",
         "another lab",
@@ -132,7 +132,7 @@
       ]
     },
     "callback": {
-      "label": "Asked for a call back",
+      "label": "Call-back requested",
       "words": [
         "call me",
         "call later",
@@ -146,7 +146,7 @@
       ]
     },
     "coming": {
-      "label": "Will come in",
+      "label": "Visit confirmed",
       "words": [
         "yes",
         "ok",

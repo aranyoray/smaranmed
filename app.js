@@ -138,7 +138,7 @@ function localPriority(p) {
 }
 
 function present(p) {
-  if (p.escalated) return { ...p, label: 'Escalated to doctor' };
+  if (p.escalated) return { ...p, label: 'Escalated to clinician' };
   const day = parseDay(p.next);
   if (!day) return p;
   const now = new Date();
@@ -229,7 +229,7 @@ async function loadPatients() {
     if (apiAvailable || !offlineLoaded) patients = FALLBACK_PATIENTS.map(withLocalFields).map(present);
     offlineLoaded = true;
     apiAvailable = false;
-    if (err && err.status === 401) toast('Enter the staff key in Settings to load the clinic queue.');
+    if (err && err.status === 401) toast('Enter the staff key in Settings to load clinic data.');
   }
   renderCounts();
   renderList();
@@ -315,7 +315,7 @@ function renderList() {
   if (nlIds) rows.sort((a, b) => nlIds.indexOf(a.id) - nlIds.indexOf(b.id));
 
   if (!rows.length) {
-    $('#patientList').innerHTML = '<div class="empty" style="padding:50px 20px"><p>No one matches this view.</p></div>';
+    $('#patientList').innerHTML = '<div class="empty" style="padding:50px 20px"><p>No patients match this view.</p></div>';
     return;
   }
 
@@ -385,7 +385,7 @@ function renderDetail(p) {
   const msgText = p.msg ? p.msg[msgLang] || p.msg.en || '' : '';
 
   const recallBlock = (p.recall || []).length ? `
-    <h3 class="block">Recall rules applied</h3>
+    <h3 class="block">Recall schedule</h3>
     <div class="recall-list">${p.recall.map(r => `
       <div class="recall-item">
         <strong>${esc(r.label)}</strong>
@@ -393,7 +393,7 @@ function renderDetail(p) {
         <span>due ${esc(parseDay(r.due) ? fmtDay(parseDay(r.due)) : r.due)}</span>
       </div>`).join('')}
     </div>
-    <p class="recall-note">Published intervals (ADA, RSSDI), editable by the doctor. Scheduling only, not a diagnosis.</p>` : '';
+    <p class="recall-note">Intervals per ADA and RSSDI guidance, configurable by the clinician. For scheduling only; not a clinical assessment.</p>` : '';
 
   $('#detail').innerHTML = `
     <div class="detail-top">
@@ -407,27 +407,27 @@ function renderDetail(p) {
     ${trendCard}
 
     <div class="detail-grid">
-      <div><span>Last contact</span><b>${esc(p.last)}</b></div>
+      <div><span>Last visit</span><b>${esc(p.last)}</b></div>
       <div><span>Next recall</span><b>${esc(p.next)}</b></div>
-      <div><span>Reason to call</span><b>${esc(p.reason)}</b></div>
+      <div><span>Follow-up reason</span><b>${esc(p.reason)}</b></div>
     </div>
 
     ${recallBlock}
 
-    <h3 class="block">What Smaran noticed</h3>
+    <h3 class="block">Observations</h3>
     <div class="signals">${signals}</div>
 
-    <h3 class="block">Linked records, one patient view</h3>
-    <p class="recall-note">${esc(p.ids)} source record${p.ids === 1 ? '' : 's'}${p.conf ? ` · weakest match ${esc(p.conf)}%` : ''}</p>
+    <h3 class="block">Linked records</h3>
+    <p class="recall-note">${esc(p.ids)} source record${p.ids === 1 ? '' : 's'}${p.conf ? ` · lowest match confidence ${esc(p.conf)}%` : ''}</p>
     <div class="timeline">${timeline}</div>
 
     <div class="callout">
       <div class="callout-head">
         <div class="lead">
-          <h3>Suggested outreach</h3>
+          <h3>Outreach draft</h3>
           <span class="ai-chip">Draft</span>
         </div>
-        <span class="review-note">Human review required</span>
+        <span class="review-note">Requires staff approval</span>
       </div>
 
       <div class="lang-toggle">
@@ -442,21 +442,21 @@ function renderDetail(p) {
           <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M12 5V2L7 7l5 5V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-7Z"/></svg>
           Regenerate
         </button>
-        <span class="info-only">Information only. References visit history, not medical advice.</span>
+        <span class="info-only">Administrative reminder only. Contains no clinical advice.</span>
       </div>
 
       <div class="actions">
-        <button class="send" id="sendBtn">Approve and open WhatsApp</button>
-        <button class="secondary" id="doneBtn">Mark contacted</button>
+        <button class="send" id="sendBtn">Approve and send</button>
+        <button class="secondary" id="doneBtn">Mark as contacted</button>
       </div>
     </div>
 
     <div class="reply-box">
-      <h3 class="block">Patient replied?</h3>
-      <textarea id="replyText" rows="2" placeholder="Paste their reply, English or বাংলা"></textarea>
+      <h3 class="block">Log patient reply</h3>
+      <textarea id="replyText" rows="2" placeholder="Paste the reply (English or বাংলা)"></textarea>
       <div class="reply-foot">
-        <button class="secondary" id="replyBtn">Read reply</button>
-        <span class="info-only">Symptoms or medicine questions always go to the doctor.</span>
+        <button class="secondary" id="replyBtn">Classify reply</button>
+        <span class="info-only">Replies mentioning symptoms or medication are escalated to the clinician.</span>
       </div>
       <p class="reply-result" id="replyResult" role="status"></p>
     </div>`;
@@ -485,7 +485,7 @@ async function regenerateDraft(p) {
   const el = $('#draft');
   el.classList.add('loading');
   el.classList.remove('error');
-  el.textContent = 'Drafting...';
+  el.textContent = 'Generating draft…';
   if (p.unsub) {
     p.unsub();
     p.unsub = null;
@@ -514,12 +514,12 @@ async function regenerateDraft(p) {
     }
     el.textContent = p.msg[msgLang] || '';
     el.classList.remove('error');
-    toast('New draft ready. A person still has to approve it.');
+    toast('Draft generated. Awaiting staff approval.');
   } catch (err) {
     showDraftError(err && err.message === 'offline'
-      ? 'Draft generation needs a server. Please try again.'
-      : 'Draft generation failed. Please try again.');
-    toast('Draft generation failed');
+      ? 'Draft generation requires the clinic server.'
+      : 'Draft generation failed. Please retry.');
+    toast('Draft generation failed.');
   }
   el.classList.remove('loading');
 }
@@ -527,7 +527,7 @@ async function regenerateDraft(p) {
 async function sendDraft(p) {
   const text = p.msg ? p.msg[msgLang] || p.msg.en || '' : '';
   if (!text) {
-    toast('No draft yet. Press Regenerate first.');
+    toast('No draft available. Select Regenerate.');
     return;
   }
   // Open the tab now, inside the click, so pop-up blockers allow it.
@@ -535,7 +535,7 @@ async function sendDraft(p) {
   if (win) win.opener = null;
   try {
     let link = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    let note = 'Demo data has no real numbers. Pick a chat and press send.';
+    let note = 'Demonstration data has no phone numbers. Choose a recipient in WhatsApp.';
     if (p.threadId && CONVEX_URL) {
       const client = await getConvex();
       const result = await client.mutation(convexApi.drafts.approve, { patientId: p.id, staffKey });
@@ -543,14 +543,14 @@ async function sendDraft(p) {
     } else if (apiAvailable) {
       const result = await api(`/api/outreach/${p.id}/send?lang=${msgLang}`, { method: 'POST' });
       link = result.link;
-      note = `Approved. Press send in ${result.channel === 'sms' ? 'your SMS app' : 'WhatsApp'}.`;
+      note = `Approved. Message opened in ${result.channel === 'sms' ? 'SMS' : 'WhatsApp'} for sending.`;
     }
     if (win) win.location.href = link;
     else window.location.href = link;
     toast(note);
   } catch (err) {
     if (win) win.close();
-    toast(err && err.status === 409 ? 'No draft or phone number on file.' : 'Could not open WhatsApp. Try again.');
+    toast(err && err.status === 409 ? 'No draft or phone number on record.' : 'Unable to open WhatsApp. Please retry.');
   }
 }
 
@@ -568,20 +568,20 @@ async function logReply(p) {
       plan = Rules.classifyReply(text, keywords);
     }
   } catch {
-    toast('Could not read the reply. Try again.');
+    toast('Unable to classify the reply. Please retry.');
     return;
   }
 
   // An escalated patient stays on the list until the doctor has seen it.
   if (p.escalated) plan = { ...plan, leaves_queue: false };
-  const why = plan.matched ? ` (matched "${plan.matched}")` : '';
+  const why = plan.matched ? ` · flagged term: "${plan.matched}"` : '';
   $('#replyResult').textContent = `${plan.label}${why}.`;
 
   if (plan.leaves_queue) {
     if (apiAvailable) await loadPatients();
     else patients = patients.filter(pt => pt.id !== p.id);
     clearDetail();
-    toast(`${p.name}: ${plan.label}. Removed from today's list.`);
+    toast(`${p.name}: ${plan.label}. Removed from the queue.`);
     return;
   }
   const updated = { ...p, outcome: plan.intent, escalated: p.escalated || plan.escalate };
@@ -591,7 +591,7 @@ async function logReply(p) {
   renderList();
   renderDetail(present(updated));
   $('#replyResult').textContent = `${plan.label}${why}.`;
-  toast(plan.escalate ? `${p.name} escalated to the doctor.` : `${p.name}: ${plan.label}.`);
+  toast(plan.escalate ? `${p.name} escalated to the clinician.` : `${p.name}: ${plan.label}.`);
 }
 
 /* ---------- Plain-language search ---------- */
@@ -619,15 +619,15 @@ async function runNlSearch(q) {
     }
   } catch {
     nlIds = null;
-    note.textContent = 'Search failed. Showing name matches.';
+    note.textContent = 'Query failed. Showing name matches.';
     renderList();
     return;
   }
   if (!applied.length) {
     nlIds = null;
-    note.textContent = 'No filters recognised. Try "overdue Bengali over 60". Showing name matches.';
+    note.textContent = 'No filters recognised. Showing name matches. Example: overdue, Bengali, over 60.';
   } else {
-    note.textContent = `${nlIds.length} match: ${applied.join(' · ')}`;
+    note.textContent = `${nlIds.length} ${nlIds.length === 1 ? 'patient' : 'patients'} · ${applied.join(' · ')}`;
   }
   renderList();
 }
@@ -637,7 +637,7 @@ function clearDetail() {
   currentDetail = null;
   renderCounts();
   renderList();
-  $('#detail').innerHTML = '<div class="empty"><span class="empty-mark" aria-hidden="true">→</span><h2>Select a person</h2><p>Choose a patient from the queue to review their timeline and next action.</p></div>';
+  $('#detail').innerHTML = '<div class="empty"><span class="empty-mark" aria-hidden="true">→</span><h2>No patient selected</h2><p>Select a patient to view their record, recall schedule and outreach draft.</p></div>';
 }
 
 async function markContacted(p) {
@@ -646,16 +646,16 @@ async function markContacted(p) {
       await api(`/api/patients/${p.id}/contact`, { method: 'POST' });
       await loadPatients();
       clearDetail();
-      toast('Marked contacted.');
+      toast('Marked as contacted.');
       return;
     } catch {
-      toast('Could not save contacted. Try again.');
+      toast('Unable to update status. Please retry.');
       return;
     }
   }
   patients = patients.filter(pt => pt.id !== p.id);
   clearDetail();
-  toast('Marked contacted on this page only.');
+  toast('Marked as contacted for this session only.');
 }
 
 /* ---------- Toast ---------- */
@@ -738,7 +738,7 @@ $('#drawerSave').onclick = async () => {
   renderCounts();
   renderList();
   closeDrawer();
-  toast(savedOnServer ? 'Settings saved on the clinic record.' : 'Settings kept on this page only.');
+  toast(savedOnServer ? 'Settings saved.' : 'Settings applied for this session only.');
   if (selected && currentDetail) renderDetail(present(currentDetail));
 };
 
@@ -762,7 +762,7 @@ $('#search').onkeydown = e => {
 
 $('#runSync').onclick = async () => {
   if (!apiAvailable) {
-    toast('Sync needs the clinic server.');
+    toast('Sync requires the clinic server.');
     return;
   }
 
@@ -770,21 +770,21 @@ $('#runSync').onclick = async () => {
   btn.disabled = true;
   btn.classList.add('syncing');
   const strip = $('#aiSummary');
-  strip.textContent = 'Connecting to AKTIV...';
-  let linkingTimer = setTimeout(() => { strip.textContent = 'Linking records...'; }, 1000);
+  strip.textContent = 'Connecting to AKTIV…';
+  let linkingTimer = setTimeout(() => { strip.textContent = 'Linking records…'; }, 1000);
 
   try {
     const result = await api('/api/sync', { method: 'POST' });
     clearTimeout(linkingTimer);
     linkingTimer = null;
-    strip.textContent = `Linked ${result.records_linked} records and wrote ${result.signals_generated} signals.`;
+    strip.textContent = `Sync complete: ${result.records_linked} records linked, ${result.signals_generated} observations added.`;
     $('#syncTime').textContent = 'Last run ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     await loadPatients();
-    toast(`Sync complete. ${result.records_linked} records linked. ${result.signals_generated} signals.`);
+    toast('Sync complete.');
   } catch {
     clearTimeout(linkingTimer);
-    strip.textContent = 'Sync failed. The list is unchanged.';
-    toast('Sync failed. Try again.');
+    strip.textContent = 'Sync failed. The queue is unchanged.';
+    toast('Sync failed. Please retry.');
   }
 
   btn.disabled = false;

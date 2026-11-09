@@ -7,15 +7,15 @@
 
   var INTENT_ORDER = ['escalate', 'deceased', 'opt_out', 'wrong_number', 'moved', 'elsewhere', 'callback', 'coming'];
   var ACTIONS = {
-    escalate: [false, 'Escalated to doctor'],
+    escalate: [false, 'Escalated to clinician'],
     deceased: [true, 'Reported deceased'],
-    opt_out: [true, 'Asked to stop messages'],
+    opt_out: [true, 'Opted out of messages'],
     wrong_number: [true, 'Wrong number'],
-    moved: [true, 'Moved away'],
-    elsewhere: [true, 'Testing elsewhere'],
-    callback: [false, 'Asked for a call back'],
-    coming: [true, 'Will come in'],
-    unclear: [false, 'Reply needs a person to read']
+    moved: [true, 'Relocated'],
+    elsewhere: [true, 'Testing at another facility'],
+    callback: [false, 'Call-back requested'],
+    coming: [true, 'Visit confirmed'],
+    unclear: [false, 'Requires manual review']
   };
   var UNREACHABLE = { opt_out: 1, wrong_number: 1, deceased: 1, moved: 1 };
   var CRITICAL_PRIORITY = 0.5;

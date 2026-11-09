@@ -180,7 +180,7 @@ def update_priorities(state: SyncState) -> SyncState:
             score += 0.10
         if patient.get("escalated_at"):
             score = 1.0
-            label = "Escalated to doctor"
+            label = "Escalated to clinician"
         db.update_patient_priority(patient["id"], round(min(score, 1.0), 3))
         if label:
             db.update_patient_status(patient["id"], status, label)
