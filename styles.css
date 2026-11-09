@@ -368,6 +368,7 @@ h3.block{font-size:14px;color:var(--ink);font-weight:600;margin:24px 0 12px;lett
 }
 @media(max-width:760px){
   .topbar{padding:0 16px;gap:14px}
+  .brand{min-width:0;margin-right:auto}
   .clinic{display:none}
   .hero{padding:24px 18px 16px;flex-direction:column;align-items:flex-start;gap:18px}
   .ai-strip{margin:0 18px 18px;flex-direction:column;align-items:flex-start;gap:8px}
