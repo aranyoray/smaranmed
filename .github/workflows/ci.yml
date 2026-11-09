@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover tests
+      - name: Linkage eval (synthetic)
+        run: python -m eval.linkage_eval
+      - name: AKTIV importer (sample, dry run)
+        run: python -m backend.importers.aktiv eval/samples/aktiv_sample.csv --dry-run
+      - name: API imports
+        env:
+          SUPABASE_URL: http://localhost
+          SUPABASE_KEY: ci
+          OPENAI_API_KEY: ci
+          STAFF_KEY: ci
+          SCHEDULER_ENABLED: "false"
+        run: python -c "import backend.main"

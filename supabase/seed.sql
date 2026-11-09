@@ -88,3 +88,23 @@ insert into signals (patient_id, text, confidence, sub_text, source) values
   ('BR-12177', 'Second recall missed in a row.',                   null, null, 'system'),
   ('BR-12177', 'Two record IDs merged into one patient view.',     0.95, 'Matched on phone number + Bengali name spelling.', 'system'),
   ('BR-12177', 'Time between visits is getting longer.',           null, null, 'system');
+
+-- Identity fields used by record linkage (sex gate, birth-year check)
+update patients set sex = 'f', birth_year = 1969 where id = 'BR-10482';
+update patients set sex = 'm', birth_year = 1962 where id = 'BR-08831';
+update patients set sex = 'f', birth_year = 1977 where id = 'BR-11602';
+update patients set sex = 'm', birth_year = 1985 where id = 'BR-09544';
+update patients set sex = 'm', birth_year = 1955 where id = 'BR-07319';
+update patients set sex = 'f', birth_year = 1974 where id = 'BR-12177';
+
+-- More unlinked records for the sync demo: Bengali script, and a relative
+-- who shares a phone (must stay unlinked).
+insert into source_records (source_id, source_system, name_raw, phone_raw, age, sex, record_date) values
+  ('AKT-NEW-04', 'aktiv',   'নাসিমা খাতুন',        '+91 98300 09072', 49, 'F', '2026-10-02'),
+  ('AKT-NEW-05', 'aktiv',   'Sujit Das',          '9830003125', 56, 'M', '2026-10-05');
+
+-- Other annual tests, so recall rules use more than HbA1c
+insert into lab_results (patient_id, test_type, value, unit, result_date, source_system) values
+  ('BR-09544', 'lipid', null, null, '2025-09-20', 'aktiv'),
+  ('BR-09544', 'uacr',  null, null, '2026-07-03', 'aktiv'),
+  ('BR-12177', 'lipid', null, null, '2025-08-23', 'aktiv');

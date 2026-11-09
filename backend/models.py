@@ -39,6 +39,16 @@ class PatientSummary(BaseModel):
     label: str
     a1c: List[LabResult] = []
     a1c_trend: Optional[TrendInfo] = None
+    escalated: bool = False
+
+
+class RecallItem(BaseModel):
+    test: str
+    label: str
+    months: int
+    last: str
+    due: str
+    overdue_days: int = 0
 
 
 class PatientDetail(BaseModel):
@@ -59,6 +69,8 @@ class PatientDetail(BaseModel):
     signals: List[Signal] = []
     events: List[TimelineEvent] = []
     outreach: Optional[OutreachDraft] = None
+    escalated: bool = False
+    recall_items: List[RecallItem] = []
 
 
 class OutreachDraft(BaseModel):
@@ -96,6 +108,55 @@ class SettingsResponse(BaseModel):
     default_lang: str
     overdue_days: int
     outreach_channel: str
+
+
+class RecallRule(BaseModel):
+    test: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=80)
+    months: int = Field(ge=1, le=36)
+    months_off_goal: Optional[int] = Field(None, ge=1, le=36)
+    goal_below: Optional[float] = None
+    source: str = "Clinic rule"
+
+
+class ReplyIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ReplyResult(BaseModel):
+    intent: str
+    label: str
+    leaves_queue: bool
+    escalate: bool
+    matched: Optional[str] = None
+    by: str = "rule"
+
+
+class SearchIn(BaseModel):
+    q: str = Field(min_length=1, max_length=300)
+
+
+class SearchFilters(BaseModel):
+    statuses: List[str] = []
+    critical: bool = False
+    reachable: bool = False
+    escalated: bool = False
+    lang: Optional[str] = None
+    due_within_days: Optional[int] = None
+    min_age: Optional[int] = None
+    max_age: Optional[int] = None
+
+
+class SearchResult(BaseModel):
+    ids: List[str]
+    applied: List[str]
+    by: str = "rule"
+
+
+class SendResult(BaseModel):
+    status: str
+    channel: str
+    link: str
 
 
 class ErrorResponse(BaseModel):

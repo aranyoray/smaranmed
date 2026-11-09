@@ -10,7 +10,8 @@ from backend import db
 from backend.agents.fallbacks import llm_with_fallback, retry_llm
 from backend.models import Signal
 from backend.observability import logger, tracker
-from backend.record_linking import match_record_to_patients
+from backend.recall_rules import compute_recall
+from backend.record_linking import match_details
 from backend.schedule import days_past_recall, recall_presentation
 
 
@@ -56,7 +57,7 @@ class SignalList(TypedDict):
 
 
 def load_data(state: SyncState) -> SyncState:
-    patients = db.fetch_patients()
+    patients = db.fetch_all_patients()
     unlinked = db.fetch_unlinked_records()
     run = db.create_sync_run()
     logger.info("Sync started: %d unlinked records, %d patients", len(unlinked), len(patients))
@@ -78,15 +79,21 @@ def match_records(state: SyncState) -> SyncState:
 
     for rec in unlinked:
         try:
-            patient_id, confidence = match_record_to_patients(rec, patients)
+            found = match_details(rec, patients)
+            if found["ambiguous"]:
+                db.flag_record_for_review(rec["id"])
+                logger.info("Record %s needs review: two close candidates", rec.get("source_id"))
+                continue
+            patient_id, confidence = found["patient_id"], found["score"]
             if not patient_id:
                 continue
             db.link_record(rec["id"], patient_id, confidence)
+            db.attach_lab_from_record(rec, patient_id)
             db.insert_signal(
                 patient_id,
                 f"New record from {rec.get('source_system', 'unknown')} linked with {confidence:.0%} confidence.",
                 confidence=confidence,
-                sub_text=f"Matched source ID {rec.get('source_id', '?')} on phone + name.",
+                sub_text=f"Matched source ID {rec.get('source_id', '?')} on {' + '.join(found['reasons'])}.",
                 source="system",
             )
             links += 1
@@ -107,9 +114,10 @@ def detect_patterns(state: SyncState) -> SyncState:
     signals_count = 0
 
     for patient in patients:
+        if patient.get("contacted_at"):
+            continue
         pid = patient["id"]
         events = db.fetch_events(pid)
-        source_recs = db.get_db().table("source_records").select("id").eq("patient_id", pid).execute()
         visit_dates = ", ".join(str(e.get("event_date", "")) for e in events if e.get("event_type") in ("visit", "lab"))
         db.delete_ai_signals(pid)
 
@@ -122,7 +130,7 @@ def detect_patterns(state: SyncState) -> SyncState:
                     "status": patient.get("status", ""),
                     "last_visit": patient.get("last_visit", "unknown"),
                     "next_recall": patient.get("next_recall", "unknown"),
-                    "source_count": len(source_recs.data) if source_recs.data else 0,
+                    "source_count": db.count_source_records(pid),
                     "visit_dates": visit_dates or "none recorded",
                 },
                 config={"callbacks": [tracker]},
@@ -137,24 +145,32 @@ def detect_patterns(state: SyncState) -> SyncState:
 
 
 def update_priorities(state: SyncState) -> SyncState:
+    """Recompute each recall from the rules, then status and a scheduling-only priority."""
     patients = state.get("patients", [])
     threshold = 90
+    rules = None
     try:
         settings = db.fetch_settings()
         if settings and settings.get("overdue_days"):
             threshold = int(settings["overdue_days"])
+        rules = settings.get("recall_rules") if settings else None
     except Exception:
-        logger.exception("Using the default overdue threshold")
+        logger.exception("Using the default overdue threshold and recall rules")
 
+    labs = db.fetch_labs_by_patient([p["id"] for p in patients], test_type=None)
     for patient in patients:
         if patient.get("contacted_at"):
             continue
+        recall = compute_recall(labs.get(patient["id"], []), rules)
+        next_recall = recall["next_recall"] or patient.get("next_recall")
+        if recall["next_recall"]:
+            db.update_patient_recall(patient["id"], next_recall, recall["reason"])
         status, label = recall_presentation(
-            patient.get("next_recall"),
-            patient.get("status") or "due",
+            next_recall,
+            "slipping" if recall["slipping"] else "due",
             threshold,
         )
-        days = days_past_recall(patient.get("next_recall"))
+        days = days_past_recall(next_recall)
         score = 0.0
         if days is not None and days > 0:
             score += min(days / 365, 0.5)
@@ -162,6 +178,9 @@ def update_priorities(state: SyncState) -> SyncState:
             score += 0.15
         elif status == "slipping":
             score += 0.10
+        if patient.get("escalated_at"):
+            score = 1.0
+            label = "Escalated to doctor"
         db.update_patient_priority(patient["id"], round(min(score, 1.0), 3))
         if label:
             db.update_patient_status(patient["id"], status, label)

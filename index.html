@@ -75,8 +75,9 @@
         </div>
         <div class="search">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M10 4a6 6 0 1 1-4.24 10.24l-3 3-1.42-1.42 3-3A6 6 0 0 1 10 4Zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg>
-          <input id="search" placeholder="Search name, phone or record ID">
+          <input id="search" placeholder="Name or ID, or ask: critical and reachable this week" aria-describedby="searchNote">
         </div>
+        <p class="search-note" id="searchNote" role="status">Press Enter to search in plain language.</p>
         <div class="chips">
           <button class="chip active" data-filter="all">All <b id="allCount"></b></button>
           <button class="chip" data-filter="overdue">Overdue <b id="overdueCount"></b></button>
@@ -103,6 +104,10 @@
       <button class="icon-btn" id="drawerClose" aria-label="Close settings">✕</button>
     </div>
     <div class="drawer-body">
+      <label class="field">
+        <span>Staff key</span>
+        <input id="setStaffKey" type="password" autocomplete="off" placeholder="Given by the clinic admin">
+      </label>
       <label class="field">
         <span>Nightly sync time</span>
         <select id="setSync">
@@ -144,6 +149,7 @@
   </aside>
 
   <div class="toast" id="toast"></div>
+  <script src="cockpit-rules.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

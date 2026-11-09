@@ -82,6 +82,16 @@ const FALLBACK_PATIENTS = [
 let patients = [...FALLBACK_PATIENTS];
 let apiAvailable = false;
 let currentDetail = null;
+let keywords = null;
+let nlIds = null;
+const Rules = window.SmaranRules;
+
+async function loadKeywords() {
+  try {
+    const res = await fetch('cockpit-keywords.json');
+    if (res.ok) keywords = await res.json();
+  } catch { /* reply and search rules need this file */ }
+}
 
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -110,7 +120,24 @@ function parseDay(value) {
   return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
+function fmtDay(d) {
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/* Same scheduling-only score as the nightly sync (backend/agents/sync.py). */
+function localPriority(p) {
+  if (p.escalated) return 1;
+  const day = parseDay(p.next);
+  const now = new Date();
+  const days = day ? Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - day) / 86400000) : 0;
+  let score = days > 0 ? Math.min(days / 365, 0.5) : 0;
+  if (p.status === 'overdue') score += 0.15;
+  else if (p.status === 'slipping') score += 0.10;
+  return Math.min(score, 1);
+}
+
 function present(p) {
+  if (p.escalated) return { ...p, label: 'Escalated to doctor' };
   const day = parseDay(p.next);
   if (!day) return p;
   const now = new Date();
@@ -134,10 +161,18 @@ function present(p) {
   return { ...p, status, label };
 }
 
+function storageGet(key) {
+  try { return localStorage.getItem(key) || ''; } catch { return ''; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* private window */ }
+}
+let staffKey = storageGet('smaran-staff-key');
+
 async function api(path, opts = {}) {
   const res = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
     ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Staff-Key': staffKey, ...opts.headers },
   });
   if (!res.ok) {
     const error = new Error(`API ${res.status}`);
@@ -177,6 +212,9 @@ function mapApiPatient(p) {
     })),
     events: (p.events || []).map(e => [e.date, e.title, e.detail]),
     msg: p.outreach ? { en: p.outreach.en, bn: p.outreach.bn } : null,
+    escalated: !!p.escalated,
+    recall: (p.recall_items || []).map(r => ({ label: r.label, months: r.months, due: r.due, overdue: r.overdue_days })),
+    hasPhone: !!p.phone_last4,
   };
 }
 
@@ -185,24 +223,36 @@ async function loadPatients() {
     const data = await api('/api/patients');
     patients = data.map(mapApiPatient).map(present);
     apiAvailable = true;
-  } catch {
-    patients = FALLBACK_PATIENTS.map(present);
+  } catch (err) {
+    patients = FALLBACK_PATIENTS.map(withLocalFields).map(present);
     apiAvailable = false;
+    if (err && err.status === 401) toast('Enter the staff key in Settings to load the clinic queue.');
   }
   renderCounts();
   renderList();
 }
 
+/* Offline demo rows: fill the fields the server would send. */
+function withLocalFields(p) {
+  const latest = p.a1c && p.a1c.length ? p.a1c[p.a1c.length - 1].v : null;
+  const months = latest !== null && latest >= 7 ? 3 : 6;
+  return {
+    hasPhone: true,
+    recall: [{ label: 'HbA1c', months, due: p.next }],
+    ...p,
+  };
+}
+
 async function loadPatientDetail(id) {
   if (!apiAvailable) {
-    const local = FALLBACK_PATIENTS.find(p => p.id === id);
+    const local = patients.find(p => p.id === id);
     return local ? present(local) : null;
   }
   try {
     const data = await api(`/api/patients/${id}`);
     return present(mapApiPatient(data));
   } catch {
-    const local = FALLBACK_PATIENTS.find(p => p.id === id);
+    const local = patients.find(p => p.id === id);
     return local ? present(local) : null;
   }
 }
@@ -251,12 +301,15 @@ function renderCounts() {
 }
 
 /* ---------- Queue list ---------- */
+function tone(p) { return p.escalated ? 'escalated' : p.status; }
+
 function renderList() {
-  const q = $('#search').value.toLowerCase();
+  const q = nlIds ? '' : $('#search').value.toLowerCase();
   const rows = patients.filter(p =>
     (active === 'all' || p.status === active) &&
-    `${p.name} ${p.phone} ${p.id}`.toLowerCase().includes(q)
+    (nlIds ? nlIds.includes(p.id) : `${p.name} ${p.phone} ${p.id}`.toLowerCase().includes(q))
   );
+  if (nlIds) rows.sort((a, b) => nlIds.indexOf(a.id) - nlIds.indexOf(b.id));
 
   if (!rows.length) {
     $('#patientList').innerHTML = '<div class="empty" style="padding:50px 20px"><p>No one matches this view.</p></div>';
@@ -266,11 +319,11 @@ function renderList() {
   $('#patientList').innerHTML = rows.map(p => {
     const sp = sparkline(p.a1c, 74, 26);
     return `<div class="patient ${selected === p.id ? 'selected' : ''}" data-id="${esc(p.id)}">
-      <span class="accent ${esc(p.status)}"></span>
+      <span class="accent ${esc(tone(p))}"></span>
       <div class="p-main">
         <div class="patient-name">${esc(p.name)}</div>
         <div class="patient-meta">${esc(p.id)} · ${esc(p.phone)} · ${esc(p.age)} yrs</div>
-        <span class="badge ${esc(p.status)}">${esc(p.label)}</span>
+        <span class="badge ${esc(tone(p))}">${esc(p.label)}</span>
       </div>
       <div class="p-trend">
         ${sp.svg}
@@ -328,13 +381,24 @@ function renderDetail(p) {
 
   const msgText = p.msg ? p.msg[msgLang] || p.msg.en || '' : '';
 
+  const recallBlock = (p.recall || []).length ? `
+    <h3 class="block">Recall rules applied</h3>
+    <div class="recall-list">${p.recall.map(r => `
+      <div class="recall-item">
+        <strong>${esc(r.label)}</strong>
+        <span>every ${esc(r.months)} months</span>
+        <span>due ${esc(parseDay(r.due) ? fmtDay(parseDay(r.due)) : r.due)}</span>
+      </div>`).join('')}
+    </div>
+    <p class="recall-note">Published intervals (ADA, RSSDI), editable by the doctor. Scheduling only, not a diagnosis.</p>` : '';
+
   $('#detail').innerHTML = `
     <div class="detail-top">
       <div>
         <h2>${esc(p.name)}</h2>
         <div class="detail-id">${esc(p.id)} · ${esc(p.age)} years · ${esc(p.phone)}</div>
       </div>
-      <span class="status-pill ${esc(p.status)}">${esc(p.label)}</span>
+      <span class="status-pill ${esc(tone(p))}">${esc(p.label)}</span>
     </div>
 
     ${trendCard}
@@ -345,10 +409,13 @@ function renderDetail(p) {
       <div><span>Reason to call</span><b>${esc(p.reason)}</b></div>
     </div>
 
+    ${recallBlock}
+
     <h3 class="block">What Smaran noticed</h3>
     <div class="signals">${signals}</div>
 
     <h3 class="block">Linked records, one patient view</h3>
+    <p class="recall-note">${esc(p.ids)} source record${p.ids === 1 ? '' : 's'}${p.conf ? ` · weakest match ${esc(p.conf)}%` : ''}</p>
     <div class="timeline">${timeline}</div>
 
     <div class="callout">
@@ -376,9 +443,19 @@ function renderDetail(p) {
       </div>
 
       <div class="actions">
-        <button class="send" id="sendBtn">Send via WhatsApp</button>
+        <button class="send" id="sendBtn">Approve and open WhatsApp</button>
         <button class="secondary" id="doneBtn">Mark contacted</button>
       </div>
+    </div>
+
+    <div class="reply-box">
+      <h3 class="block">Patient replied?</h3>
+      <textarea id="replyText" rows="2" placeholder="Paste their reply, English or বাংলা"></textarea>
+      <div class="reply-foot">
+        <button class="secondary" id="replyBtn">Read reply</button>
+        <span class="info-only">Symptoms or medicine questions always go to the doctor.</span>
+      </div>
+      <p class="reply-result" id="replyResult" role="status"></p>
     </div>`;
 
   $$('.lang-toggle button').forEach(b => b.onclick = () => {
@@ -388,7 +465,8 @@ function renderDetail(p) {
   });
 
   $('#regen').onclick = () => regenerateDraft(p);
-  $('#sendBtn').onclick = () => approveDraft(p);
+  $('#sendBtn').onclick = () => sendDraft(p);
+  $('#replyBtn').onclick = () => logReply(p);
   $('#doneBtn').onclick = () => markContacted(p);
 }
 
@@ -412,13 +490,13 @@ async function regenerateDraft(p) {
   try {
     if (CONVEX_URL) {
       const client = await getConvex();
-      const result = await client.action(convexApi.draft.generate, { patientId: p.id });
+      const result = await client.action(convexApi.draft.generate, { patientId: p.id, staffKey });
       if (!result || result.error) throw new Error(result && result.error ? result.error : 'Draft failed');
       p.threadId = result.threadId;
       p.msg = { en: result.en, bn: result.bn };
       if (p.unsub) p.unsub();
       try {
-        p.unsub = client.onUpdate(convexApi.drafts.latest, { patientId: p.id }, row => {
+        p.unsub = client.onUpdate(convexApi.drafts.latest, { patientId: p.id, staffKey }, row => {
           if (!row || selected !== p.id) return;
           p.msg = { en: row.en, bn: row.bn };
           const box = $('#draft');
@@ -443,24 +521,111 @@ async function regenerateDraft(p) {
   el.classList.remove('loading');
 }
 
-async function approveDraft(p) {
+async function sendDraft(p) {
+  const text = p.msg ? p.msg[msgLang] || p.msg.en || '' : '';
+  if (!text) {
+    toast('No draft yet. Press Regenerate first.');
+    return;
+  }
+  // Open the tab now, inside the click, so pop-up blockers allow it.
+  const win = window.open('', '_blank');
+  if (win) win.opener = null;
   try {
+    let link = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    let note = 'Demo data has no real numbers. Pick a chat and press send.';
     if (p.threadId && CONVEX_URL) {
       const client = await getConvex();
-      const result = await client.mutation(convexApi.drafts.approve, { patientId: p.id });
+      const result = await client.mutation(convexApi.drafts.approve, { patientId: p.id, staffKey });
       if (!result || result.error) throw Object.assign(new Error('none'), { status: 409 });
-      toast('Approved. A person still has to send it.');
-      return;
+    } else if (apiAvailable) {
+      const result = await api(`/api/outreach/${p.id}/send?lang=${msgLang}`, { method: 'POST' });
+      link = result.link;
+      note = `Approved. Press send in ${result.channel === 'sms' ? 'your SMS app' : 'WhatsApp'}.`;
     }
-    if (!apiAvailable) {
-      toast('No server is connected, so nothing was approved.');
-      return;
-    }
-    await api(`/api/outreach/${p.id}/approve`, { method: 'POST' });
-    toast('Approved. A person still has to send it.');
+    if (win) win.location.href = link;
+    else window.location.href = link;
+    toast(note);
   } catch (err) {
-    toast(err && err.status === 409 ? 'No draft to approve.' : 'Approval failed. Try again.');
+    if (win) win.close();
+    toast(err && err.status === 409 ? 'No draft or phone number on file.' : 'Could not open WhatsApp. Try again.');
   }
+}
+
+async function logReply(p) {
+  const box = $('#replyText');
+  const text = box.value.trim();
+  if (!text) return;
+  let plan;
+  try {
+    if (apiAvailable) {
+      plan = await api(`/api/patients/${p.id}/reply`, { method: 'POST', body: JSON.stringify({ text }) });
+    } else {
+      if (!keywords) await loadKeywords();
+      if (!keywords) throw new Error('rules');
+      plan = Rules.classifyReply(text, keywords);
+    }
+  } catch {
+    toast('Could not read the reply. Try again.');
+    return;
+  }
+
+  // An escalated patient stays on the list until the doctor has seen it.
+  if (p.escalated) plan = { ...plan, leaves_queue: false };
+  const why = plan.matched ? ` (matched "${plan.matched}")` : '';
+  $('#replyResult').textContent = `${plan.label}${why}.`;
+
+  if (plan.leaves_queue) {
+    if (apiAvailable) await loadPatients();
+    else patients = patients.filter(pt => pt.id !== p.id);
+    clearDetail();
+    toast(`${p.name}: ${plan.label}. Removed from today's list.`);
+    return;
+  }
+  const updated = { ...p, outcome: plan.intent, escalated: p.escalated || plan.escalate };
+  if (!updated.escalated) updated.label = plan.label;
+  patients = patients.map(pt => (pt.id === p.id ? { ...pt, outcome: updated.outcome, escalated: updated.escalated, label: updated.label } : pt));
+  renderCounts();
+  renderDetail(present(updated));
+  $('#replyResult').textContent = `${plan.label}${why}.`;
+  toast(plan.escalate ? `${p.name} escalated to the doctor.` : `${p.name}: ${plan.label}.`);
+}
+
+/* ---------- Plain-language search ---------- */
+async function runNlSearch(q) {
+  const note = $('#searchNote');
+  let applied = [];
+  try {
+    if (apiAvailable) {
+      const result = await api('/api/search', { method: 'POST', body: JSON.stringify({ q }) });
+      nlIds = result.ids;
+      applied = result.applied;
+    } else {
+      if (!keywords) await loadKeywords();
+      if (!keywords) throw new Error('rules');
+      const filters = Rules.parseQuery(q, keywords);
+      applied = Rules.describe(filters);
+      const today = new Date();
+      nlIds = patients
+        .filter(p => Rules.matches({
+          status: p.status, priority_score: localPriority(p), hasPhone: p.hasPhone !== false,
+          outcome: p.outcome, escalated: p.escalated, lang: p.lang, age: p.age, recall: parseDay(p.next),
+        }, filters, today))
+        .sort((a, b) => localPriority(b) - localPriority(a))
+        .map(p => p.id);
+    }
+  } catch {
+    nlIds = null;
+    note.textContent = 'Search failed. Showing name matches.';
+    renderList();
+    return;
+  }
+  if (!applied.length) {
+    nlIds = null;
+    note.textContent = 'No filters recognised. Try "overdue Bengali over 60". Showing name matches.';
+  } else {
+    note.textContent = `${nlIds.length} match: ${applied.join(' · ')}`;
+  }
+  renderList();
 }
 
 function clearDetail() {
@@ -513,6 +678,7 @@ async function openDrawer() {
   $('#drawer').classList.add('show');
   $('#drawer').setAttribute('aria-hidden', 'false');
   $('#drawerBackdrop').classList.add('show');
+  $('#setStaffKey').value = staffKey;
   if (!apiAvailable) return;
   try {
     const settings = await api('/api/settings');
@@ -540,6 +706,12 @@ $('#drawerBackdrop').onclick = closeDrawer;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
 $('#drawerSave').onclick = async () => {
+  const newKey = $('#setStaffKey').value.trim();
+  if (newKey !== staffKey) {
+    staffKey = newKey;
+    storageSet('smaran-staff-key', staffKey);
+    await loadPatients();
+  }
   defaultLang = $('#setLang').value;
   overdueDays = parseInt($('#setThreshold').value, 10) || 90;
   const syncVal = $('#setSync').value;
@@ -573,7 +745,16 @@ $$('.chip').forEach(c => c.onclick = () => {
   active = c.dataset.filter;
   renderList();
 });
-$('#search').oninput = renderList;
+$('#search').oninput = () => {
+  if (nlIds) {
+    nlIds = null;
+    $('#searchNote').textContent = '';
+  }
+  renderList();
+};
+$('#search').onkeydown = e => {
+  if (e.key === 'Enter' && e.target.value.trim()) runNlSearch(e.target.value.trim());
+};
 
 $('#runSync').onclick = async () => {
   if (!apiAvailable) {
@@ -610,4 +791,5 @@ $('#runSync').onclick = async () => {
 document.querySelector('.clinic b').textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 /* ---------- Init ---------- */
+loadKeywords();
 loadPatients();

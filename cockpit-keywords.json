@@ -1,0 +1,234 @@
+{
+  "_note": "Shared by backend/replies.py, backend/search.py and app.js. Lowercase. Escalation always wins over every other intent.",
+  "replies": {
+    "escalate": {
+      "label": "Escalate to doctor",
+      "words": [
+        "chest pain",
+        "breathless",
+        "can't breathe",
+        "cannot breathe",
+        "short of breath",
+        "unconscious",
+        "fainted",
+        "faint",
+        "fits",
+        "seizure",
+        "very low sugar",
+        "sugar low",
+        "low sugar",
+        "hypo",
+        "shaking",
+        "sweating a lot",
+        "vomiting",
+        "blood in urine",
+        "wound",
+        "ulcer",
+        "foot sore",
+        "blackened",
+        "swelling",
+        "blurred vision",
+        "can't see",
+        "pregnant",
+        "side effect",
+        "reaction",
+        "stopped medicine",
+        "stopped my medicine",
+        "which medicine",
+        "insulin dose",
+        "how much insulin",
+        "emergency",
+        "hospital",
+        "admitted",
+        "বুকে ব্যথা",
+        "শ্বাসকষ্ট",
+        "অজ্ঞান",
+        "খিঁচুনি",
+        "সুগার কমে",
+        "সুগার কম",
+        "ঘাম",
+        "বমি",
+        "ঘা",
+        "ফোলা",
+        "চোখে ঝাপসা",
+        "গর্ভবতী",
+        "ওষুধ বন্ধ",
+        "কোন ওষুধ",
+        "ইনসুলিন",
+        "হাসপাতাল",
+        "ভর্তি"
+      ]
+    },
+    "deceased": {
+      "label": "Reported deceased",
+      "words": [
+        "passed away",
+        "expired",
+        "died",
+        "no more",
+        "মারা গেছেন",
+        "মারা গেছে",
+        "প্রয়াত"
+      ]
+    },
+    "opt_out": {
+      "label": "Asked to stop messages",
+      "words": [
+        "stop",
+        "unsubscribe",
+        "don't message",
+        "do not message",
+        "don't call",
+        "do not call",
+        "not interested",
+        "বন্ধ করুন",
+        "মেসেজ পাঠাবেন না",
+        "ফোন করবেন না",
+        "আগ্রহী নই"
+      ]
+    },
+    "wrong_number": {
+      "label": "Wrong number",
+      "words": [
+        "wrong number",
+        "wrong person",
+        "who is this",
+        "ভুল নম্বর",
+        "চিনি না"
+      ]
+    },
+    "moved": {
+      "label": "Moved away",
+      "words": [
+        "moved",
+        "shifted",
+        "relocated",
+        "another city",
+        "outside kolkata",
+        "out of station",
+        "চলে গেছি",
+        "শিফট",
+        "অন্য শহরে",
+        "বাইরে থাকি"
+      ]
+    },
+    "elsewhere": {
+      "label": "Testing elsewhere",
+      "words": [
+        "other lab",
+        "another lab",
+        "elsewhere",
+        "other doctor",
+        "another doctor",
+        "different clinic",
+        "other clinic",
+        "already tested",
+        "got tested",
+        "done the test",
+        "অন্য জায়গায়",
+        "অন্য ল্যাব",
+        "অন্য ডাক্তার",
+        "টেস্ট করিয়েছি"
+      ]
+    },
+    "callback": {
+      "label": "Asked for a call back",
+      "words": [
+        "call me",
+        "call later",
+        "busy",
+        "next week",
+        "later",
+        "পরে ফোন",
+        "ফোন করুন",
+        "ব্যস্ত",
+        "পরের সপ্তাহে"
+      ]
+    },
+    "coming": {
+      "label": "Will come in",
+      "words": [
+        "yes",
+        "ok",
+        "okay",
+        "will come",
+        "coming",
+        "i'll come",
+        "book",
+        "booked",
+        "sure",
+        "tomorrow",
+        "1",
+        "হ্যাঁ",
+        "আসব",
+        "আসবো",
+        "আসছি",
+        "ঠিক আছে",
+        "১"
+      ]
+    }
+  },
+  "search": {
+    "overdue": [
+      "overdue",
+      "late",
+      "missed",
+      "lost",
+      "বকেয়া"
+    ],
+    "slipping": [
+      "slipping",
+      "slip",
+      "drifting",
+      "gap"
+    ],
+    "due": [
+      "due soon",
+      "upcoming",
+      "due"
+    ],
+    "critical": [
+      "critical",
+      "urgent",
+      "priority",
+      "high risk",
+      "important",
+      "জরুরি"
+    ],
+    "reachable": [
+      "reachable",
+      "has phone",
+      "with phone",
+      "can call",
+      "contactable",
+      "whatsapp"
+    ],
+    "escalated": [
+      "escalated",
+      "flagged",
+      "doctor review"
+    ],
+    "bn": [
+      "bengali",
+      "bangla",
+      "বাংলা"
+    ],
+    "en": [
+      "english"
+    ],
+    "today": [
+      "today",
+      "now"
+    ],
+    "week": [
+      "this week",
+      "week",
+      "7 days"
+    ],
+    "month": [
+      "this month",
+      "month",
+      "30 days"
+    ]
+  }
+}

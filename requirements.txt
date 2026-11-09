@@ -7,3 +7,4 @@ langsmith
 pydantic-settings
 rapidfuzz
 tenacity
+tzdata

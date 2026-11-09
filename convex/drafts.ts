@@ -1,9 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { isStaff } from "./auth";
 
 export const latest = query({
-  args: { patientId: v.string() },
-  handler: async (ctx, { patientId }) => {
+  args: { patientId: v.string(), staffKey: v.string() },
+  handler: async (ctx, { patientId, staffKey }) => {
+    if (!isStaff(staffKey)) return null;
     const row = await ctx.db
       .query("drafts")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -14,8 +16,9 @@ export const latest = query({
 });
 
 export const approve = mutation({
-  args: { patientId: v.string() },
-  handler: async (ctx, { patientId }) => {
+  args: { patientId: v.string(), staffKey: v.string() },
+  handler: async (ctx, { patientId, staffKey }) => {
+    if (!isStaff(staffKey)) return { error: "Staff key required" };
     const row = await ctx.db
       .query("drafts")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))

@@ -225,3 +225,131 @@ def fetch_recent_outreach(patient_id: str, limit: int = 3):
     db = get_db()
     rows = db.table("outreach_drafts").select("*").eq("patient_id", patient_id).order("created_at", desc=True).limit(limit).execute()
     return rows.data
+
+
+def fetch_labs_by_patient(patient_ids: list, test_type: Optional[str] = "hba1c") -> dict:
+    """One query for many patients, keyed by patient id."""
+    grouped = {pid: [] for pid in patient_ids}
+    if not patient_ids:
+        return grouped
+    db = get_db()
+    query = db.table("lab_results").select("*").in_("patient_id", patient_ids)
+    if test_type:
+        query = query.eq("test_type", test_type)
+    for row in query.order("result_date").execute().data or []:
+        grouped.setdefault(row["patient_id"], []).append(row)
+    return grouped
+
+
+def fetch_all_labs(patient_id: str):
+    return fetch_labs_by_patient([patient_id], test_type=None)[patient_id]
+
+
+def count_source_records(patient_id: str) -> int:
+    return link_stats(patient_id)[0]
+
+
+def link_stats(patient_id: str) -> tuple:
+    """(number of linked source records, weakest link confidence or None)."""
+    db = get_db()
+    rows = db.table("source_records").select("confidence").eq("patient_id", patient_id).execute().data or []
+    scores = [r["confidence"] for r in rows if r.get("confidence") is not None]
+    return len(rows), (min(scores) if scores else None)
+
+
+def flag_record_for_review(record_id: int):
+    db = get_db()
+    db.table("source_records").update({"review": True}).eq("id", record_id).execute()
+
+
+def update_patient_recall(patient_id: str, next_recall: Optional[str], recall_reason: str):
+    db = get_db()
+    db.table("patients").update({"next_recall": next_recall, "recall_reason": recall_reason}).eq("id", patient_id).execute()
+
+
+def fetch_recall_rules() -> Optional[list]:
+    return fetch_settings().get("recall_rules")
+
+
+def save_recall_rules(rules: list):
+    return update_settings({"recall_rules": rules}).get("recall_rules")
+
+
+def insert_event(patient_id: str, title: str, detail: str = "", event_type: str = "reply"):
+    db = get_db()
+    db.table("events").insert({
+        "patient_id": patient_id,
+        "event_date": datetime.now(timezone.utc).date().isoformat(),
+        "title": title,
+        "detail": detail,
+        "event_type": event_type,
+    }).execute()
+
+
+def record_reply(patient_id: str, text: str, plan: dict):
+    db = get_db()
+    db.table("patient_replies").insert({
+        "patient_id": patient_id,
+        "text": text,
+        "intent": plan["intent"],
+        "matched": plan.get("matched"),
+        "classified_by": plan.get("by", "rule"),
+    }).execute()
+
+    update = {"outcome": plan["intent"], "label": plan["label"]}
+    if plan["leaves_queue"]:
+        update["contacted_at"] = _utc_now()
+    if plan["escalate"]:
+        update["escalated_at"] = _utc_now()
+        update["priority_score"] = 1.0
+    db.table("patients").update(update).eq("id", patient_id).execute()
+
+
+def mark_outreach_sent(patient_id: str) -> int:
+    db = get_db()
+    rows = (
+        db.table("outreach_drafts")
+        .update({"status": "sent"})
+        .eq("patient_id", patient_id)
+        .eq("status", "approved")
+        .execute()
+    )
+    return len(rows.data or [])
+
+
+def fetch_all_patients():
+    """Every patient, contacted or not. Record linkage must see all of them."""
+    db = get_db()
+    return db.table("patients").select("*").execute().data
+
+
+def fetch_source_records(source_system: str):
+    db = get_db()
+    return db.table("source_records").select("source_id, data").eq("source_system", source_system).execute().data or []
+
+
+def insert_source_records(records: list) -> int:
+    if not records:
+        return 0
+    db = get_db()
+    inserted = 0
+    for start in range(0, len(records), 500):
+        rows = db.table("source_records").insert(records[start:start + 500]).execute()
+        inserted += len(rows.data or [])
+    return inserted
+
+
+def attach_lab_from_record(record: dict, patient_id: str):
+    """Copy a mirrored lab result into lab_results once its record is linked."""
+    data = record.get("data") or {}
+    if not data.get("test_type") or not data.get("result_date"):
+        return
+    db = get_db()
+    db.table("lab_results").insert({
+        "patient_id": patient_id,
+        "test_type": data["test_type"],
+        "value": data.get("value"),
+        "unit": data.get("unit"),
+        "result_date": data["result_date"],
+        "source_system": record.get("source_system"),
+    }).execute()

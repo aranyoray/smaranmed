@@ -3,11 +3,12 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { Agent, createTool } from "@convex-dev/agent";
 import { convexGateway } from "@convex-dev/ai-sdk-provider";
-import { stepCountIs, type LanguageModel } from "ai";
+import { stepCountIs } from "ai";
 import { v } from "convex/values";
 import { z } from "zod";
 import { components, internal } from "./_generated/api";
 import { action } from "./_generated/server";
+import { isStaff } from "./auth";
 
 const CLINICAL = /hba1c|insulin|mg\/dl|mmol|diagnos|prescri|\b\d+(?:\.\d+)?\s*%/i;
 
@@ -42,7 +43,9 @@ const searchPolicy = createTool({
   },
 });
 
-function makeAgent(languageModel: LanguageModel) {
+type AgentModel = NonNullable<ConstructorParameters<typeof Agent>[1]["languageModel"]>;
+
+function makeAgent(languageModel: AgentModel) {
   return new Agent(components.agent, {
     name: "Outreach drafter",
     languageModel,
@@ -72,8 +75,9 @@ function rejected(en: string, bn: string) {
 }
 
 export const generate = action({
-  args: { patientId: v.string() },
-  handler: async (ctx, { patientId }) => {
+  args: { patientId: v.string(), staffKey: v.string() },
+  handler: async (ctx, { patientId, staffKey }) => {
+    if (!isStaff(staffKey)) return { error: "Staff key required" };
     await ctx.runMutation(internal.patients.ensurePatients, {});
     const known = await ctx.runQuery(internal.patients.getScheduling, { patientId });
     if (!known) return { error: "Unknown patient" };
