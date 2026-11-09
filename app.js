@@ -583,8 +583,9 @@ async function logReply(p) {
   }
   const updated = { ...p, outcome: plan.intent, escalated: p.escalated || plan.escalate };
   if (!updated.escalated) updated.label = plan.label;
-  patients = patients.map(pt => (pt.id === p.id ? { ...pt, outcome: updated.outcome, escalated: updated.escalated, label: updated.label } : pt));
+  patients = patients.map(pt => (pt.id === p.id ? present({ ...pt, outcome: updated.outcome, escalated: updated.escalated }) : pt));
   renderCounts();
+  renderList();
   renderDetail(present(updated));
   $('#replyResult').textContent = `${plan.label}${why}.`;
   toast(plan.escalate ? `${p.name} escalated to the doctor.` : `${p.name}: ${plan.label}.`);
