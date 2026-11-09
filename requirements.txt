@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+supabase
+langgraph
+langchain-openai
+langsmith
+pydantic-settings
+rapidfuzz
+tenacity
