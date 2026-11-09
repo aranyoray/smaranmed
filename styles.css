@@ -372,3 +372,12 @@ h3.block{font-size:14px;color:var(--ink);font-weight:600;margin:24px 0 12px;lett
   .metrics{margin:0 18px 18px;grid-template-columns:1fr 1fr}
   .demo-note{margin:16px 18px 0}
 }
+
+/* ---------- Link to patient check-in ---------- */
+.checkin-link{
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:7px 12px;border-radius:8px;border:1px solid var(--teal-border);
+  background:var(--teal-tint);color:var(--teal-dark);font-size:13px;font-weight:500;text-decoration:none;
+}
+.checkin-link:hover{background:#d9eeea}
+@media(max-width:760px){.checkin-link{padding:6px 9px;font-size:12px}}

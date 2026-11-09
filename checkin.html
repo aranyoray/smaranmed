@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f7d75">
+  <title>Smaran: Weekly sugar & heart check-in</title>
+  <link rel="stylesheet" href="checkin.css">
+</head>
+<body>
+  <header class="ci-top">
+    <a class="ci-brand" href="index.html" title="Clinic view">
+      <span class="mark">S</span>
+      <span class="ci-brand-text"><strong>Smaran</strong><small data-i18n="tagline">Weekly sugar &amp; heart check-in</small></span>
+    </a>
+    <div class="ci-top-right">
+      <span class="pts" id="ptsPill" title="Points"><span aria-hidden="true">⭐</span> <b id="ptsVal">0</b></span>
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="en" class="on">EN</button>
+        <button data-lang="bn">বাংলা</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="ci-main" id="app" aria-live="polite"></main>
+
+  <footer class="ci-foot" data-i18n="footer">Smaran gives reminders and general health information. It does not diagnose. Always confirm with a doctor.</footer>
+
+  <script src="checkin-engine.js"></script>
+  <script src="checkin.js"></script>
+</body>
+</html>
